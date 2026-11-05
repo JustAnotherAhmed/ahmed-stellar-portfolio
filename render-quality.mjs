@@ -33,3 +33,12 @@ export function satelliteSafeZoom(requested,viewport,anchorX,scale,reach=17,marg
   const available=Math.max(1,Math.min(anchorX-viewport.left,viewport.left+viewport.width-anchorX)-margin);
   return Math.max(1,Math.min(requested,available/(reach*scale)));
 }
+
+/** Quality-first retina framebuffer up to 4x pixel density.
+ * Hardware maximum renderbuffer dimension is the only safety cap.
+ * No mobile/device-memory FPS or megapixel budget downshift. */
+export function cinematicPixelRatio(width,height,deviceRatio=1,maxRenderbuffer=16384){
+  if(![width,height,deviceRatio,maxRenderbuffer].every(Number.isFinite)||width<=0||height<=0||maxRenderbuffer<1)return 1;
+  const ratio=Math.max(2.5,Math.min(4,deviceRatio*1.5));
+  return Math.max(.5,Math.min(ratio,maxRenderbuffer/width,maxRenderbuffer/height));
+}

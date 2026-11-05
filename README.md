@@ -135,3 +135,24 @@ closely related work. Run `node --test *.test.mjs` to check regressions.
 - Preconnect to the existing Three.js CDN to reduce connection setup latency when external Three.js loads.
 - No paid services, build tooling, or changes to the score, audio preference, accessibility, or orbital camera framing.
 - Validate with `node --test *.test.mjs`. No specific Core Web Vitals or percentage gains are claimed without real-user measurement.
+
+## V9 Ultra-HD release — visual quality first
+
+All ten celestial bodies start loading their highest available Solar System
+Scope imagery immediately, using 4096x2048 GPU maps. A 4K procedural
+fallback remains if a source image fails; Uranus and Neptune's available
+2K source maps are upscaled and do not have genuine 4K geological detail.
+Earth includes transparent 4K clouds and city lights on the night side.
+Saturn, Jupiter, Uranus and Neptune get detailed radial ring textures.
+Sphere meshes are 192x144 segments; GPU pixel density targets 2.5-4x
+up to the hardware renderbuffer limit, with a 60Hz frame rate target.
+
+Tradeoff: this setting is intentionally much more graphics/memory-heavy,
+especially on phones. Existing soundtrack, accessibility, résumé,
+knowledge quiz, canonical domain and cinematic focus are preserved.
+Map credit: Solar System Scope, CC BY 4.0
+(https://www.solarsystemscope.com/textures/).
+No measured speed or visual benchmark is claimed. 4K remote texture
+loading requires external network/CORS support.
+
+Verification: `node --test *.test.mjs` plus Vercel preview check.

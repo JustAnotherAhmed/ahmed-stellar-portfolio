@@ -21,7 +21,7 @@ test('planet focus and return controls exist and giant Saturn ring artifact is r
   assert.match(html,/id="solar-return"/);assert.match(html,/id="solar-closeup"/);
   assert.doesNotMatch(html,/class="solar-aura"/);
   assert.match(solar,/startCameraTransition/);assert.match(solar,/focusZoomFor/);
-  assert.match(textures,/new THREE\.RingGeometry\(config\.inner,config\.outer,128\)/);
+  assert.match(textures,/new THREE\.RingGeometry\(config\.inner,config\.outer,384\)/);
 });
 test('quiz has an explicit curated topic selector and no paid API generation',()=>{
   const html=read('index.html');

@@ -11,7 +11,7 @@ function blended(colors,t){const x=Math.max(0,Math.min(.999,t))*(colors.length-1
 export function createSurfaceTexture(THREE,id,{width=1024}={}) {
   if(typeof document==='undefined')return null;
   const palette=palettes[id];if(!palette)return null;
-  const canvas=document.createElement('canvas');canvas.width=Math.max(512,Math.min(2048,Math.round(width)));canvas.height=canvas.width/2;
+  const canvas=document.createElement('canvas');canvas.width=Math.max(512,Math.min(4096,Math.round(width)));canvas.height=canvas.width/2;
   const ctx=canvas.getContext('2d');if(!ctx)return null;
   const sw=canvas.width,sh=canvas.height,colors=palette.map(rgb);
   const data=ctx.createImageData(sw,sh),pixels=data.data;
@@ -48,7 +48,7 @@ export function createSurfaceTexture(THREE,id,{width=1024}={}) {
   ctx.putImageData(data,0,0);
   // Impact craters, bands and a recognizable Great Red Spot are part of the texture itself.
   if(['moon','mercury','mars'].includes(id)){
-    const n=id==='mars'?130:310;
+    const n=id==='mars'?360:620;
     for(let i=0;i<n;i++){
       const x=hash(i,4,id.length)*sw,y=hash(i,17,id.length)*sh;
       const radius=((id==='mars'?1:2)+hash(i,21,id.length)*(id==='mars'?7:11))*(sw/768);
@@ -67,7 +67,7 @@ export function createSurfaceTexture(THREE,id,{width=1024}={}) {
   const texture=new THREE.CanvasTexture(canvas);
   texture.colorSpace=THREE.SRGBColorSpace;
   texture.wrapS=THREE.RepeatWrapping;
-  texture.anisotropy=8;texture.generateMipmaps=true;
+  texture.anisotropy=16;texture.generateMipmaps=true;
   texture.minFilter=THREE.LinearMipmapLinearFilter;
   texture.magFilter=THREE.LinearFilter;
   return texture;
@@ -77,69 +77,171 @@ export function createAtmosphere(THREE,color,opacity=.42) {
     uniforms:{glowColor:{value:new THREE.Color(color)},strength:{value:opacity}},
     vertexShader:`varying vec3 vNormal;varying vec3 vPosition;void main(){vNormal=normalize(normalMatrix*normal);vec4 view=modelViewMatrix*vec4(position,1.);vPosition=view.xyz;gl_Position=projectionMatrix*view;}`,
     fragmentShader:`uniform vec3 glowColor;uniform float strength;varying vec3 vNormal;varying vec3 vPosition;void main(){float rim=pow(1.0-abs(dot(normalize(vNormal),normalize(-vPosition))),2.4);gl_FragColor=vec4(glowColor,rim*strength);}`});
-  return new THREE.Mesh(new THREE.SphereGeometry(1.055,48,32),mat);
+  return new THREE.Mesh(new THREE.SphereGeometry(1.055,128,96),mat);
 }
-export function addRings(THREE,mesh,id) {
-  const specifications={
-    jupiter:{inner:1.32,outer:1.48,color:0x927d67,opacity:.13,tilt:.63},
-    saturn:{inner:1.18,outer:2.18,color:0xd4c2a6,opacity:.77,tilt:.48},
-    uranus:{inner:1.35,outer:1.85,color:0x89d3d3,opacity:.37,tilt:1.1},
-    neptune:{inner:1.36,outer:1.53,color:0x8aa2c9,opacity:.23,tilt:.9}
-  };
-  const config=specifications[id];if(!config)return;
-  const rings=new THREE.Mesh(new THREE.RingGeometry(config.inner,config.outer,128),
-    new THREE.MeshBasicMaterial({color:config.color,side:THREE.DoubleSide,transparent:true,opacity:config.opacity,depthWrite:false}));
-  rings.rotation.x=config.tilt;rings.rotation.y=.18;mesh.add(rings);
-  // Geometry is in unit-sphere coordinates: never multiply radii by body.size again.
-}
-
-/** Transparent, subtly varied Earth cloud layer. */
-export function addEarthClouds(THREE,earth){
+/** High-frequency 4K radial bands and gaps; retains Saturn's real relative ring size. */
+export function makeRingTexture(THREE,id,width=4096){
   if(typeof document==='undefined')return null;
-  const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=512;
+  const canvas=document.createElement('canvas');canvas.width=width;canvas.height=64;
   const ctx=canvas.getContext('2d');if(!ctx)return null;
-  const image=ctx.createImageData(canvas.width,canvas.height);
-  for(let y=0;y<canvas.height;y++){
-    const lat=(y/canvas.height-.5)*Math.PI;
-    for(let x=0;x<canvas.width;x++){
-      const lon=x/canvas.width*Math.PI*2;
-      const broad=Math.sin(lon*11+Math.sin(lat*5)*1.8)*Math.cos(lat*17-lon*2);
-      const middle=Math.sin(lon*27-lat*19)*Math.cos(lat*35+lon*9);
-      const detail=hash(x>>3,y>>3);
-      const shape=.56*broad+.33*middle+.12*(detail-.5);
-      const alpha=Math.min(185,Math.max(0,Math.floor((shape-.18)*250)));
-      const i=(y*canvas.width+x)*4;
-      image.data[i]=245;image.data[i+1]=248;image.data[i+2]=255;image.data[i+3]=alpha;
+  const pixels=ctx.createImageData(width,64);
+  const base=id==='saturn'?[218,198,164]:id==='uranus'?[147,201,198]:[159,172,191];
+  for(let x=0;x<width;x++){
+    const u=x/(width-1);
+    const ridges=.5+.24*Math.sin(u*260)+.16*Math.sin(u*740)+.1*Math.cos(u*1460);
+    const gaps=id==='saturn' ?
+      ((u>.30&&u<.342)||(u>.683&&u<.71)? .02:1) : .78;
+    const fringe=Math.min(1,u*30,(1-u)*30);
+    const alpha=Math.max(0,Math.min(1,(.36+ridges*.57)*gaps*fringe));
+    const warmth=15*Math.sin(u*24)+8*Math.sin(u*145);
+    for(let y=0;y<64;y++){
+      const i=(y*width+x)*4;
+      pixels.data[i]=Math.min(255,Math.max(0,base[0]+warmth));
+      pixels.data[i+1]=Math.min(255,Math.max(0,base[1]+warmth*.7));
+      pixels.data[i+2]=Math.min(255,Math.max(0,base[2]+warmth*.6));
+      pixels.data[i+3]=Math.round(alpha*255);
     }
   }
-  ctx.putImageData(image,0,0);
-  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-  const material=new THREE.MeshStandardMaterial({map:texture,transparent:true,depthWrite:false,opacity:.78,
-    roughness:1,metalness:0,side:THREE.FrontSide});
-  const cloudSphere=new THREE.Mesh(new THREE.SphereGeometry(1.018,80,64),material);
+  ctx.putImageData(pixels,0,0);
+  const t=new THREE.CanvasTexture(canvas);
+  t.colorSpace=THREE.SRGBColorSpace;
+  t.anisotropy=16;t.generateMipmaps=true;
+  return t;
+}
+export function addRings(THREE,mesh,id){
+  const specifications={
+    jupiter:{inner:1.32,outer:1.48,opacity:.19,tilt:.63},
+    saturn:{inner:1.18,outer:2.18,opacity:.87,tilt:.48},
+    uranus:{inner:1.35,outer:1.85,opacity:.45,tilt:1.1},
+    neptune:{inner:1.36,outer:1.53,opacity:.28,tilt:.9}
+  };
+  const config=specifications[id];if(!config)return null;
+  const geometry=new THREE.RingGeometry(config.inner,config.outer,384);
+  const pos=geometry.getAttribute('position'),uv=geometry.getAttribute('uv');
+  for(let i=0;i<pos.count;i++){
+    const r=Math.hypot(pos.getX(i),pos.getY(i));
+    uv.setXY(i,(r-config.inner)/(config.outer-config.inner),.5);
+  }
+  uv.needsUpdate=true;
+  const rings=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({
+    map:makeRingTexture(THREE,id),side:THREE.DoubleSide,transparent:true,
+    opacity:config.opacity,alphaTest:.035,roughness:1,metalness:0,depthWrite:false
+  }));
+  rings.rotation.x=config.tilt;rings.rotation.y=.18;mesh.add(rings);
+  return rings;
+}
+/** Translucent 4K cloud layer above the Earth. */
+export function addEarthClouds(THREE,earth,{texture=null,width=4096}={}){
+  if(!texture && typeof document==='undefined')return null;
+  if(!texture){
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=width/2;
+    const ctx=canvas.getContext('2d');if(!ctx)return null;
+    const image=ctx.createImageData(canvas.width,canvas.height);
+    for(let y=0;y<canvas.height;y++){
+      const lat=(y/canvas.height-.5)*Math.PI;
+      for(let x=0;x<canvas.width;x++){
+        const lon=x/canvas.width*Math.PI*2;
+        const broad=Math.sin(lon*11+Math.sin(lat*5)*1.8)*Math.cos(lat*17-lon*2);
+        const middle=Math.sin(lon*27-lat*19)*Math.cos(lat*35+lon*9);
+        const detail=hash(x>>3,y>>3);
+        const shape=.56*broad+.33*middle+.12*(detail-.5);
+        const alpha=Math.min(185,Math.max(0,Math.floor((shape-.18)*250)));
+        const i=(y*canvas.width+x)*4;
+        image.data[i]=245;image.data[i+1]=248;image.data[i+2]=255;image.data[i+3]=alpha;
+      }
+    }
+    ctx.putImageData(image,0,0);
+    texture=new THREE.CanvasTexture(canvas);
+    texture.colorSpace=THREE.SRGBColorSpace;
+    texture.anisotropy=16;
+  }
+  const material=new THREE.MeshStandardMaterial({map:texture,transparent:true,
+    depthWrite:false,opacity:.85,roughness:1,metalness:0});
+  const cloudSphere=new THREE.Mesh(new THREE.SphereGeometry(1.018,160,112),material);
   cloudSphere.name='Earth cloud layer';earth.add(cloudSphere);
   return cloudSphere;
 }
-/** Real visual maps from Solar System Scope, CC BY 4.0. Procedural maps always work offline. */
+export function cloudAlphaTexture(THREE,image,width=4096){
+  if(typeof document==='undefined')return null;
+  const canvas=document.createElement('canvas');canvas.width=width;canvas.height=width/2;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)return null;
+  ctx.drawImage(image,0,0,width,width/2);
+  const pixels=ctx.getImageData(0,0,width,width/2);
+  for(let i=0;i<pixels.data.length;i+=4){
+    const l=(pixels.data[i]*.2126+pixels.data[i+1]*.7152+pixels.data[i+2]*.0722)/255;
+    pixels.data[i]=245;pixels.data[i+1]=248;pixels.data[i+2]=255;
+    pixels.data[i+3]=Math.max(0,Math.min(255,Math.round((l-.14)*345)));
+  }
+  ctx.putImageData(pixels,0,0);
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+  texture.anisotropy=16;return texture;
+}
+/** Solar System Scope CC BY 4.0 maps. Some 8K filenames contain smaller source imagery.
+ * 2K Uranus/Neptune maps are interpolated, not genuine native 4K surface detail. */
 export const PHOTO_TEXTURE_PATHS=Object.freeze({
-  sun:'2k_sun.jpg',mercury:'2k_mercury.jpg',venus:'2k_venus_atmosphere.jpg',
-  earth:'2k_earth_daymap.jpg',moon:'2k_moon.jpg',mars:'2k_mars.jpg',
-  jupiter:'2k_jupiter.jpg',saturn:'2k_saturn.jpg',uranus:'2k_uranus.jpg',neptune:'2k_neptune.jpg',
+  sun:'8k_sun.jpg',mercury:'8k_mercury.jpg',venus:'4k_venus_atmosphere.jpg',
+  earth:'8k_earth_daymap.jpg',moon:'8k_moon.jpg',mars:'8k_mars.jpg',
+  jupiter:'8k_jupiter.jpg',saturn:'8k_saturn.jpg',
+  uranus:'2k_uranus.jpg',neptune:'2k_neptune.jpg'
 });
+export const EARTH_DETAIL_PATHS=Object.freeze({
+  clouds:'8k_earth_clouds.jpg',night:'8k_earth_nightmap.jpg'
+});
+export const ATLAS_WIDTH=4096;
+export function atlasUrl(filename){
+  return 'https://www.solarsystemscope.com/textures/download/'+filename;
+}
 export function planetPhotoUrl(id){
-  const file=PHOTO_TEXTURE_PATHS[id];
-  return file ? 'https://www.solarsystemscope.com/textures/download/'+file : null;
+  const file=PHOTO_TEXTURE_PATHS[id];return file?atlasUrl(file):null;
+}
+export function prepare4kTexture(THREE,image,{width=ATLAS_WIDTH}={}){
+  if(typeof document==='undefined')throw new Error('Canvas environment unavailable');
+  const canvas=document.createElement('canvas');canvas.width=width;canvas.height=width/2;
+  const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Texture conversion canvas unavailable');
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  ctx.drawImage(image,0,0,width,width/2);
+  const texture=new THREE.CanvasTexture(canvas);
+  texture.colorSpace=THREE.SRGBColorSpace;
+  texture.anisotropy=16;texture.generateMipmaps=true;
+  texture.minFilter=THREE.LinearMipmapLinearFilter;
+  texture.magFilter=THREE.LinearFilter;
+  return texture;
 }
 export function loadPlanetPhoto(THREE,id,onLoad,onError=()=>{}){
-  const url=planetPhotoUrl(id);
-  if(!url){onError(new Error('No photographic texture for '+id));return;}
-  try{
-    const loader=new THREE.TextureLoader();loader.setCrossOrigin('anonymous');
-    loader.load(url,texture=>{
-      texture.colorSpace=THREE.SRGBColorSpace;
-      texture.anisotropy=8;
-      texture.minFilter=THREE.LinearMipmapLinearFilter;
-      onLoad(texture);
-    },undefined,error=>onError(error));
-  }catch(error){onError(error);}
+  const file=PHOTO_TEXTURE_PATHS[id];if(!file){onError(new Error('No atlas for '+id));return;}
+  const loader=new THREE.ImageLoader();loader.setCrossOrigin('anonymous');
+  loader.load(atlasUrl(file),image=>{
+    try{onLoad(prepare4kTexture(THREE,image));}catch(e){onError(e);}
+  },undefined,onError);
+}
+export function loadCloudImage(THREE,onLoad,onError=()=>{}){
+  const loader=new THREE.ImageLoader();loader.setCrossOrigin('anonymous');
+  loader.load(atlasUrl(EARTH_DETAIL_PATHS.clouds),image=>{
+    try{const texture=cloudAlphaTexture(THREE,image);if(!texture)throw Error('Cloud texture unavailable');onLoad(texture);}catch(e){onError(e);}
+  },undefined,onError);
+}
+export function addEarthNightLights(THREE,earth,texture){
+  const material=new THREE.ShaderMaterial({
+    transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+    uniforms:{nightMap:{value:texture},brightness:{value:.7},sunWorldPosition:{value:new THREE.Vector3(0,0,48)}},
+    vertexShader:`varying vec2 vUv;varying vec3 vNormalW;varying vec3 vWorldPos;void main(){
+      vUv=uv;vec4 wp=modelMatrix*vec4(position,1.0);vWorldPos=wp.xyz;
+      vNormalW=normalize(mat3(modelMatrix)*normal);
+      gl_Position=projectionMatrix*viewMatrix*wp;}`,
+    fragmentShader:`uniform sampler2D nightMap;uniform float brightness;uniform vec3 sunWorldPosition;
+      varying vec2 vUv;varying vec3 vNormalW;varying vec3 vWorldPos;
+      void main(){vec3 lightDir=normalize(sunWorldPosition-vWorldPos);
+      float shadow=clamp((.20-dot(normalize(vNormalW),lightDir))/.5,0.0,1.0);
+      vec3 city=texture2D(nightMap,vUv).rgb;
+      float brightnessMask=max(city.r,max(city.g,city.b));
+      gl_FragColor=vec4(city*vec3(1.0,.88,.63)*brightness*shadow,brightnessMask*shadow*.72);}`
+  });
+  const globe=new THREE.Mesh(new THREE.SphereGeometry(1.009,160,112),material);
+  globe.name='Earth city lights';earth.add(globe);return globe;
+}
+export function loadNightLights(THREE,onLoad,onError=()=>{}){
+  const loader=new THREE.ImageLoader();loader.setCrossOrigin('anonymous');
+  loader.load(atlasUrl(EARTH_DETAIL_PATHS.night),image=>{
+    try{onLoad(prepare4kTexture(THREE,image));}catch(e){onError(e);}
+  },undefined,onError);
 }
