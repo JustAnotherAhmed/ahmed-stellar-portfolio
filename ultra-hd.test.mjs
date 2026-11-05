@@ -46,7 +46,7 @@ test('ultra-HD rings and Earth night lights retain full camera focus',()=>{
   assert.match(textures,/addEarthNightLights/);
   assert.match(textures,/sunWorldPosition/);
   assert.match(solar,/new THREE\.SphereGeometry\(1,192,144\)/);
-  assert.match(solar,/for\(const body of SOLAR_BODIES\)\{\s*try\{loadPlanetPhoto/);
+  assert.match(solar,/textureQueue=createTextureQueue\(queueIds/);
   assert.match(solar,/loadNightLights/);
   assert.match(solar,/anchoredCameraOffset\(world\.position,cameraState,worldScale,cameraState\.zoom/);
   assert.doesNotMatch(solar,/queueTextureUpgrade\(/);
