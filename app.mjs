@@ -1,4 +1,4 @@
-import { SIGNALS, initialGame, updateGame } from './game.mjs';
+import { QUESTIONS, LEVELS, initialGame, updateGame } from './game.mjs';
 import { readAchievement, writeAchievement } from './storage.mjs';
 
 const $ = (selector, context = document) => context.querySelector(selector);
@@ -47,7 +47,8 @@ const commands = [
   { label: 'Skills & toolkit', hint: '03 / SYSTEMS', target: '#skills', icon: '◈' },
   { label: 'About & education', hint: '04 / PROFILE', target: '#about', icon: '⌁' },
   { label: 'Contact Ahmed', hint: '05 / SAY HELLO', target: '#contact', icon: '↗' },
-  { label: 'Signal decoder game', hint: 'BONUS / SIDE QUEST', target: '#signal', icon: '✧' },
+  { label: 'Web design lab', hint: 'INTERACTIVE / LIVE PREVIEW', target: '#web-lab', icon: '◈' },
+  { label: 'AI knowledge quiz', hint: 'BONUS / SIDE QUEST', target: '#signal', icon: '✧' },
 ];
 
 function initCommandPalette() {
@@ -140,46 +141,53 @@ function initCommandPalette() {
 function initSignalGame() {
   const root = $('#signal-game');
   if (!root) return;
-  const idle = $('#game-idle');
-  const active = $('#game-active');
-  const complete = $('#game-complete');
-  const question = $('#game-question');
-  const options = $('#game-options');
-  const progress = $('#game-progress');
-  const feedback = $('#game-feedback');
-  const next = $('#game-next');
-  const achievement = $('#achievement-indicator');
+  const idle = $('#game-idle'), active = $('#game-active'), complete = $('#game-complete');
+  const question = $('#game-question'), options = $('#game-options'), progress = $('#game-progress');
+  const feedback = $('#game-feedback'), next = $('#game-next'), result = $('#game-result');
+  const achievement = $('#achievement-indicator'), track = $('#quiz-level-track');
   let state = initialGame();
   const storage = (() => { try { return window.localStorage; } catch { return null; } })();
   const showAchievement = () => {
-    if (achievement) {
-      const label = achievement.querySelector('b');
-      if (label) label.textContent = 'unlocked ✓';
-      achievement.classList.add('is-unlocked');
-    }
+    if (!achievement) return;
+    const label = achievement.querySelector('b');
+    if (label) label.textContent = 'unlocked ✓';
+    achievement.classList.add('is-unlocked');
   };
   if (readAchievement(storage)) showAchievement();
   const render = () => {
     idle.hidden = state.phase !== 'idle';
     active.hidden = state.phase !== 'playing';
     complete.hidden = state.phase !== 'complete';
-    if (state.phase === 'complete') { writeAchievement(storage); showAchievement(); return; }
+    if (state.phase === 'complete') {
+      result.textContent = `You scored ${state.score} out of ${QUESTIONS.length}. ${state.score === QUESTIONS.length ? 'Perfect run — AI Master!' : state.score >= 6 ? 'Brilliant work, Explorer!' : 'Nice exploration. Want another run?'}`;
+      writeAchievement(storage);
+      showAchievement();
+      return;
+    }
     if (state.phase !== 'playing') return;
-    const signal = SIGNALS[state.round];
-    if (!signal) throw new Error('Invalid game round');
-    question.textContent = signal.question;
-    progress.textContent = `TRANSMISSION ${state.round + 1} / ${SIGNALS.length}`;
+    const current = QUESTIONS[state.round];
+    if (!current) throw new Error('Invalid quiz question');
+    progress.textContent = `${current.level.toUpperCase()} · QUESTION ${state.round + 1} / ${QUESTIONS.length} · SCORE ${state.score}`;
+    question.textContent = current.question;
     feedback.textContent = state.feedback;
+    if (track) [...track.children].forEach((step, index) => {
+      step.classList.toggle('is-past', index < LEVELS.indexOf(current.level));
+      step.classList.toggle('is-current', index === LEVELS.indexOf(current.level));
+    });
     options.replaceChildren();
-    for (const choice of signal.options) {
+    for (const choice of current.options) {
       const b = document.createElement('button');
-      b.type = 'button'; b.className = 'signal-option'; b.textContent = choice;
+      b.type = 'button';
+      b.className = 'signal-option';
+      b.textContent = choice;
       b.disabled = state.answered;
-      if (state.answered && choice === signal.correct) b.classList.add('is-correct');
+      if (state.answered && choice === current.correct) b.classList.add('is-correct');
+      if (state.answered && choice === state.selected && choice !== current.correct) b.classList.add('is-wrong');
       b.addEventListener('click', () => dispatch({ type: 'ANSWER', answer: choice }));
       options.append(b);
     }
     next.hidden = !state.answered;
+    next.textContent = state.round === QUESTIONS.length - 1 ? 'See my score →' : 'Next question →';
     if (state.answered) next.focus();
   };
   const dispatch = (action) => {
@@ -187,15 +195,18 @@ function initSignalGame() {
       const previous = state;
       state = updateGame(state, action);
       render();
-      if (action.type === 'START' || action.type === 'RESTART' || action.type === 'NEXT') question.focus();
+      if (['START','RESTART','NEXT'].includes(action.type) && state.phase === 'playing') question.focus();
       if (previous.phase === 'playing' && state.phase === 'complete') $('#game-restart')?.focus();
+      if (action.type === 'EXIT') $('#game-start')?.focus();
     } catch (error) {
-      console.error('Signal decoder unavailable:', error);
+      console.error('AI quiz unavailable:', error);
       state = initialGame();
       render();
       const errorMessage = document.createElement('p');
-      errorMessage.className = 'game-error'; errorMessage.setAttribute('role', 'alert');
-      errorMessage.textContent = 'Signal lost. You can still browse the full portfolio.';
+      errorMessage.className = 'game-error';
+      errorMessage.setAttribute('role','alert');
+      errorMessage.textContent = 'Quiz temporarily unavailable. You can still explore the full portfolio.';
+      root.querySelector('.game-error')?.remove();
       root.append(errorMessage);
     }
   };
@@ -204,6 +215,26 @@ function initSignalGame() {
   $('#game-exit')?.addEventListener('click', () => dispatch({ type: 'EXIT' }));
   $('#game-restart')?.addEventListener('click', () => dispatch({ type: 'RESTART' }));
   render();
+}
+
+function initDesignLab() {
+  const root = $('#design-lab'), preview = $('#lab-preview'), status = $('#lab-status');
+  if (!root || !preview || !status) return;
+  const controls = $$('[data-lab-theme], [data-lab-layout]', root);
+  for (const button of controls) button.addEventListener('click', () => {
+    const setting = button.dataset.labTheme ? 'theme' : 'layout';
+    const value = button.dataset.labTheme || button.dataset.labLayout;
+    if (!['orbit','nova','grid','stack'].includes(value)) return;
+    preview.dataset[setting] = value;
+    for (const item of controls) {
+      if ((setting === 'theme' && item.dataset.labTheme) || (setting === 'layout' && item.dataset.labLayout)) {
+        const selected = item === button;
+        item.classList.toggle('is-active', selected);
+        item.setAttribute('aria-pressed', String(selected));
+      }
+    }
+    status.textContent = `${preview.dataset.theme === 'nova' ? 'Nova' : 'Orbit'} theme · ${preview.dataset.layout === 'stack' ? 'Stack' : 'Grid'} layout`;
+  });
 }
 
 function initCopyEmail() {
@@ -219,7 +250,7 @@ function initCopyEmail() {
       await navigator.clipboard.writeText(email);
       status.textContent = 'Email copied to clipboard.';
     } catch {
-      status.textContent = 'Clipboard unavailable. Select the email address below or use “Send a message”.';
+      status.textContent = 'Clipboard unavailable. Select the email address below or use WhatsApp.';
     }
   });
 }
@@ -227,7 +258,7 @@ function initCopyEmail() {
 /** Feature isolation: broken optional interactions must not hide résumé content. */
 for (const [name, setup] of [
   ['menu', initMenu], ['filters', initFilters], ['quick navigation', initCommandPalette],
-  ['signal decoder', initSignalGame], ['copy email', initCopyEmail],
+  ['AI knowledge quiz', initSignalGame], ['web design lab', initDesignLab], ['copy email', initCopyEmail],
 ]) {
   try { setup(); } catch (error) { console.error(`Could not initialize ${name}:`, error); }
 }
