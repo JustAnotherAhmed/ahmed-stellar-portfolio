@@ -66,3 +66,11 @@ The résumé sections are in `index.html`. The downloadable PDF is `Ahmed-Osama-
 The **quiz works fully offline once the website files are loaded**. The 3D Three.js layer is a free, pinned, open-source CDN dependency and needs internet the first time unless a local copy is bundled. It always has a no-WebGL/no-CDN fallback. There are no paid AI-provider calls.
 
 References: [Three.js](https://threejs.org/) (MIT license), [NASA Solar System](https://science.nasa.gov/solar-system/).
+
+## V5: full-bleed HD solar system
+
+The Three.js canvas now fills the entire hero background instead of a fixed 440×440 pixel element. The responsive DOM/SVG orbit picker stays aligned to the full-width scene via `sceneAnchoring()` in `render-quality.mjs`. A ResizeObserver updates the camera projection and high-DPI render target; the 9.5-million-pixel budget balances clarity with GPU demands. More detailed 128×96 sphere meshes, realistic direct lighting and a translucent Earth cloud layer improve close-up quality. The chosen planet progressively upgrades its surface to 2K; nearby unrelated planets are hidden during close-ups, and Earth's Moon is kept fully inside the viewport even on phones.
+
+**Optional planet photo-map credit:** [Solar System Scope](https://www.solarsystemscope.com/textures/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). These visual maps use NASA mission data, and may have color adjustments or inferred terrain. Credit also appears in the live planet panel. Image requests occur only on selection, and the generated textures remain a no-network fallback. No API keys or paid services are needed.
+
+The source stays vanilla JS and no-build Vercel. Run `node --test *.test.mjs` and `python smoke_browser.py` to verify the added layout, moon framing, image error fallback and the unchanged offline quiz behavior.

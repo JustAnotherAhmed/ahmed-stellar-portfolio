@@ -81,6 +81,7 @@
   </header>
   <main id="main">
    <section aria-labelledby="hero-title" class="hero container" id="top">
+    <div class="solar-background" aria-hidden="true"><canvas id="solar-canvas"></canvas></div>
     <div class="hero-copy">
      <div class="eyebrow">
       <span aria-hidden="true" class="ping-dot">
@@ -146,7 +147,7 @@
     </div>
     <div class="orbit-scene" id="solar-system" aria-label="Interactive solar system explorer">
      <div class="solar-stage">
-      <canvas id="solar-canvas" width="440" height="440" aria-hidden="true"></canvas>
+      
       <svg id="solar-orbits" aria-hidden="true" class="solar-orbits" viewBox="0 0 440 440"></svg>
       <div class="solar-closeup" id="solar-closeup" data-body="earth" aria-hidden="true">
        <div class="solar-closeup__sphere"></div><span id="solar-closeup-name">Earth</span>
@@ -161,6 +162,7 @@
       <h2 id="planet-name">Earth</h2>
       <p id="planet-display">Our home planet.</p>
       <div class="solar-fact"><b>✧ DID YOU KNOW?</b><p id="planet-fact">Earth is the only world where life has been confirmed so far.</p></div>
+      <p class="solar-credits"><a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener noreferrer">Planet imagery: Solar System Scope · CC BY 4.0</a></p>
      </div>
      <p class="solar-a11y-status visually-hidden" id="solar-status" aria-live="polite"></p>
     </div>
