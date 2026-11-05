@@ -122,6 +122,13 @@ export function createAmbientEngine({ AudioContextCtor = globalThis.AudioContext
     while (nextBell < horizon) { scheduleBell(nextBell, bellIndex++); nextBell += 3.43; }
   }
   return {
+    /** Re-request audio context resume synchronously inside a trusted gesture.
+     * Needed when the first load-time resume is still pending on mobile Safari. */
+    unlock() {
+      if(disposed || ctx.state==='running')return;
+      try{void ctx.resume().catch(()=>{});}
+      catch(error){console.warn('Audio unlock unavailable:',error);}
+    },
     async play() {
       if (disposed) throw new Error('Soundscape has already been closed.');
       await ctx.resume();
@@ -239,6 +246,14 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
     starting=task;
     return task;
   }
+  /** First swipe/touch anywhere unlocks sound, even if autoplay resume is pending. */
+  function unlockFromGesture(event){
+    if(disposed || !enabled || doc.hidden || playing)return;
+    if(event?.target?.closest?.('#ambient-toggle, #ambient-volume'))return;
+    if(starting){
+      try{engine?.unlock?.();}catch(error){console.warn('Audio unlock failed:',error);}
+    }else void start();
+  }
   function onToggle(){
     if(disposed)return;
     enabled=!enabled;
@@ -252,6 +267,7 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
     const target=event.target;
     if(typeof target?.closest !== 'function')return;
     if(target.closest('#ambient-toggle, #ambient-volume'))return;
+    unlockFromGesture(event);
     const planet=target.closest('[data-planet-sound]')?.dataset.planetSound;
     const interactive=target.closest('button, a, summary, select, input, [role="button"], [role="option"]');
     // The first click anywhere also unlocks sound, even on non-control elements.
@@ -261,7 +277,7 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
   function onKeydown(event){
     if(!enabled || playing || disposed || doc.hidden || event.repeat)return;
     if(['Shift','Control','Alt','Meta','Escape','Tab'].includes(event.key))return;
-    void start();
+    unlockFromGesture(event);
   }
   function onVisibility(){
     if(doc.hidden){void pause('Website sounds paused while the tab is hidden.');}
@@ -272,21 +288,28 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
   function onPageShow(){if(enabled && everStarted && !doc.hidden)void start();}
   button.addEventListener('click',onToggle);
   slider.addEventListener('input',onVolume);
+  // Pointerdown covers modern mobile and desktop; touchstart/touchend also
+  // catch swipe gestures and Safari versions with differing activation timing.
+  doc.addEventListener('pointerdown',unlockFromGesture,true);
+  doc.addEventListener('touchstart',unlockFromGesture,{capture:true,passive:true});
+  doc.addEventListener('touchend',unlockFromGesture,{capture:true,passive:true});
   doc.addEventListener('click',onGlobalClick,true);
   doc.addEventListener('keydown',onKeydown,true);
   doc.addEventListener('visibilitychange',onVisibility);
   view?.addEventListener?.('pagehide',onPageHide);
   view?.addEventListener?.('pageshow',onPageShow);
-  paint(enabled ? 'Sound on — starts on your first click or keypress if browser autoplay is blocked.' : 'Website sounds muted by your preference.');
-  // When a browser explicitly allows autoplay, start immediately without a gesture.
-  try{
-    if(enabled && !doc.hidden && view?.navigator?.getAutoplayPolicy?.('audiocontext')==='allowed')void start();
-  }catch{ /* getAutoplayPolicy is optional and not available everywhere. */ }
+  paint(enabled ? 'Sound on — plays immediately when allowed, otherwise at the first touch, scroll, click or keypress.' : 'Website sounds muted by your preference.');
+  // Attempt autoplay regardless of getAutoplayPolicy support. Browsers may
+  // suspend the AudioContext; the next genuine gesture releases it.
+  if(enabled && !doc.hidden)void start();
   return ()=>{
     if(disposed)return;
     disposed=true;
     button.removeEventListener('click',onToggle);
     slider.removeEventListener('input',onVolume);
+    doc.removeEventListener('pointerdown',unlockFromGesture,true);
+    doc.removeEventListener('touchstart',unlockFromGesture,true);
+    doc.removeEventListener('touchend',unlockFromGesture,true);
     doc.removeEventListener('click',onGlobalClick,true);
     doc.removeEventListener('keydown',onKeydown,true);
     doc.removeEventListener('visibilitychange',onVisibility);
