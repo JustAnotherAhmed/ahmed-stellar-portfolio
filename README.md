@@ -9,8 +9,8 @@ It is a self-contained, accessible, SEO-friendly HTML/CSS/JavaScript site with n
 | --- | --- |
 | `index.html` | The whole résumé content and portfolio HTML — **the homepage** |
 | `styles.css` | Responsive styling, cosmic layout, reduced-motion rules |
-| `app.mjs` | Navigation, filters, command palette, game UI, copy email |
-| `game.mjs` | Tested game rules and state machine |
+| `app.mjs` | Navigation, filters, command palette, AI quiz, web design lab, copy email |
+| `game.mjs` | Tested AI quiz questions, difficulty levels and state machine |
 | `storage.mjs` | Safe achievement persistence |
 | `Ahmed-Osama-Resume.pdf` | The actual uploaded résumé used by the download button |
 | `favicon.svg` | Browser tab icon |
@@ -61,7 +61,7 @@ python -m http.server 8000
 
 Open http://localhost:8000/ . Do not double-click `index.html` to test the module script, because file:// module security rules may block JavaScript.
 
-The portfolio content loads without JavaScript; the menu, filters, quick navigation, copy-email interaction and game need JavaScript enabled.
+The portfolio content loads without JavaScript; the menu, filters, quick navigation, copy-email interaction and AI quiz / web lab need JavaScript enabled.
 
 ## SEO & accessibility
 
@@ -74,3 +74,10 @@ The portfolio content loads without JavaScript; the menu, filters, quick navigat
 ## Support and maintenance
 
 See `START-HERE.md` for the exact, safe beginner deployment workflow. After GitHub is connected to Vercel, editing/committing files normally creates new deployments automatically.
+
+## Interactive portfolio refresh — November 2026
+
+- **WhatsApp CTA:** `index.html` links to `https://wa.me/971521133465` with a prefilled introduction. This opens WhatsApp; the visitor must press Send. To change the number, edit the URL with country code and no spaces or leading `+`.
+- **AI general knowledge quiz:** Eight multiple-choice questions across Easy, Intermediate, Hard and Extreme. Edit the `QUESTIONS` array in `game.mjs` to update questions, four options, the correct answer and explanations. The quiz is entirely optional.
+- **Web design lab:** Accessible Orbit/Nova theme and Grid/Stack layout controls demonstrate frontend design interactivity. Its markup is in `index.html`, styling in `styles.css`, and behavior in `app.mjs`. It is explicitly marked as a demo, not a client project.
+- **Testing:** Run `node --test portfolio.test.mjs`. The website still needs no install or build command. Merging to `main` triggers the connected Vercel production deployment.
