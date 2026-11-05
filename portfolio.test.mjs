@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { SIGNALS, initialGame, updateGame } from './game.mjs';
+import { QUESTIONS, LEVELS, initialGame, updateGame } from './game.mjs';
 import { ACHIEVEMENT_KEY, readAchievement, writeAchievement } from './storage.mjs';
 const root = dirname(fileURLToPath(import.meta.url));
 const read = (name) => readFileSync(join(root,name),'utf8');
@@ -23,6 +23,8 @@ test('the static page is readable without JavaScript', () => {
     assert.ok(page.includes(item), `Missing ${item}`);
   }
   assert.match(page, /mailto:F\.ahmed30@yahoo\.com/);
+  assert.match(page, /https:\/\/wa\.me\/971521133465\?text=/);
+  assert.match(page, /id="web-lab"/);
   assert.match(page, /Ahmed-Osama-Resume\.pdf/);
 });
 test('all local files linked by HTML exist', () => {
@@ -44,29 +46,50 @@ test('Vercel configuration deploys root with no build step', () => {
   assert.equal(config.framework,null);
   assert.ok(!config.buildCommand, 'No build command is necessary');
 });
-test('complete game sequence wins after three signals', () => {
-  let state = updateGame(initialGame(), {type: 'START'});
-  for (let i=0; i<SIGNALS.length; i++) {
-    assert.equal(state.round,i);
-    state = updateGame(state,{type:'ANSWER',answer:SIGNALS[i].correct});
+test('AI quiz includes four tiers and valid multiple-choice answers',()=>{
+  assert.deepEqual(LEVELS,['Easy','Intermediate','Hard','Extreme']);
+  assert.equal(QUESTIONS.length,8);
+  for (const q of QUESTIONS) {
+    assert.equal(q.options.length,4);
+    assert.equal(new Set(q.options).size,4);
+    assert.ok(q.options.includes(q.correct));
+    assert.ok(q.explanation.length>15);
+  }
+  assert.deepEqual(QUESTIONS.map(q=>q.level),LEVELS.flatMap(level=>[level,level]));
+});
+test('a perfect quiz run earns eight points and completes after NEXT',()=>{
+  let state=updateGame(initialGame(),{type:'START'});
+  for(let i=0;i<QUESTIONS.length;i++){
+    state=updateGame(state,{type:'ANSWER',answer:QUESTIONS[i].correct});
+    assert.equal(state.score,i+1);
     assert.equal(state.answered,true);
-    if(i<SIGNALS.length-1) state=updateGame(state,{type:'NEXT'});
+    state=updateGame(state,{type:'NEXT'});
   }
   assert.equal(state.phase,'complete');
+  assert.equal(state.score,8);
 });
-test('wrong answer allows retry; early NEXT cannot skip', () => {
-  let s=updateGame(initialGame(),{type:'START'});
-  s=updateGame(s,{type:'NEXT'});
-  assert.equal(s.round,0);
-  s=updateGame(s,{type:'ANSWER',answer:'definitely wrong'});
-  assert.match(s.feedback,/Try another/);
-  assert.equal(s.answered,false);
+test('wrong answers cannot be retried or scored',()=>{
+  let state=updateGame(initialGame(),{type:'START'});
+  assert.equal(updateGame(state,{type:'NEXT'}).round,0);
+  assert.deepEqual(updateGame(state,{type:'ANSWER',answer:'invalid option'}),state);
+  const wrong=QUESTIONS[0].options.find(choice=>choice!==QUESTIONS[0].correct);
+  state=updateGame(state,{type:'ANSWER',answer:wrong});
+  assert.equal(state.answered,true);
+  assert.equal(state.score,0);
+  assert.match(state.feedback,/Correct answer/);
+  assert.deepEqual(updateGame(state,{type:'ANSWER',answer:QUESTIONS[0].correct}),state);
 });
-test('EXIT and RESTART reset the game immediately', () => {
-  let s=updateGame(initialGame(),{type:'START'});
-  assert.deepEqual(updateGame(s,{type:'EXIT'}),initialGame());
-  s=updateGame(s,{type:'RESTART'});
-  assert.equal(s.round,0);
+test('exit and restart reset AI quiz state',()=>{
+  let state=updateGame(initialGame(),{type:'START'});
+  state=updateGame(state,{type:'ANSWER',answer:QUESTIONS[0].correct});
+  assert.deepEqual(updateGame(state,{type:'EXIT'}),initialGame());
+  assert.equal(updateGame(state,{type:'RESTART'}).score,0);
+});
+test('interactive design lab exposes accessible theme and layout controls',()=>{
+  const html=read('index.html');
+  for(const x of ['orbit','nova'])assert.ok(html.includes(`data-lab-theme="${x}"`));
+  for(const x of ['grid','stack'])assert.ok(html.includes(`data-lab-layout="${x}"`));
+  assert.ok(html.includes('aria-pressed'));
 });
 test('achievement persistence works and uses a stable key', () => {
   const store = new Map();
