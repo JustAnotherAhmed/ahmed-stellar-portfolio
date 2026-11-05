@@ -156,3 +156,17 @@ No measured speed or visual benchmark is claimed. 4K remote texture
 loading requires external network/CORS support.
 
 Verification: `node --test *.test.mjs` plus Vercel preview check.
+
+
+## v10 smooth-loading Ultra-HD
+
+The 4K planetary photo maps, 192×144 shared sphere geometry, high-detail Saturn
+rings and Earth night lights remain. Large 4K files are fetched two at a time,
+prioritizing Earth and whichever world a visitor selects. Browsers with
+createImageBitmap can rescale to 4096×2048 asynchronously instead of a blocking
+canvas draw. Earth cloud coverage uses a grayscale alpha map to avoid an
+8-million-pixel main-thread loop. Render supersampling starts at a lightweight
+level, then reaches a GPU-budgeted high-DPI resolution. Network failures show
+procedural fallback art without an expensive 4K CPU loop. All sound, quiz, camera
+and portfolio features are unchanged. Run node --test '*.test.mjs' to verify.
+Real-world loading gains depend on device/network and are not guaranteed.

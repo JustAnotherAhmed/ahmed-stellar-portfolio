@@ -1,8 +1,9 @@
 import {SOLAR_BODIES,ORBITAL_BODIES,BODY_BY_ID,INITIAL_BODY,positionsAt} from './planets.mjs';
 import {CAMERA_OVERVIEW,FOCUS_DURATION_MS,focusZoomFor,sampleCamera,transitionCamera} from './camera-focus.mjs';
-import {createSurfaceTexture,createAtmosphere,addRings,addEarthClouds,loadPlanetPhoto,loadCloudImage,loadNightLights,addEarthNightLights} from './planet-textures.mjs';
-import {sceneAnchoring,satelliteSafeZoom,anchoredCameraOffset,cinematicPixelRatio} from './render-quality.mjs';
+import {createSurfaceTexture,createAtmosphere,addRings,addEarthClouds,loadPlanetPhoto,loadCloudImage,loadNightLights,addEarthNightLights,releaseAtlasTexture} from './planet-textures.mjs';
+import {sceneAnchoring,satelliteSafeZoom,anchoredCameraOffset,balancedPixelRatio} from './render-quality.mjs';
 import {MARKER_INTERVAL_MS,dueForUpdate} from './performance.mjs';
+import {createTextureQueue} from './texture-queue.mjs';
 
 /**
  * Hybrid orrery. Transparent Three.js stage and accessible SVG/DOM markers share a 440-unit
@@ -27,6 +28,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   let cameraState={...CAMERA_OVERVIEW},cameraParallax={x:0,y:0},desiredParallax={x:0,y:0};
   const meshes=new Map(),markerMap=new Map(),pickerMap=new Map();
   let disposed=false,renderQuality=1,markerScale=1,lastMarkersAt=0,frameInterval=1000/60;
+  let textureQueue=null,qualityTimer=null,qualityPromoted=false;
   const positions=()=>positionsAt(elapsed);
   markerScale=Math.max(.01,stage.getBoundingClientRect().width/440);
   function closeupZoom(body){
@@ -76,6 +78,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     const to=nextId?{x:p.x,y:p.y,zoom:closeupZoom(body)}:CAMERA_OVERVIEW;
     transition=transitionCamera(cameraState,to,performance.now(),reduced.matches?1:FOCUS_DURATION_MS);
     updateVisibleBodies();
+    textureQueue?.prioritize(nextId);
     // Every world begins its 4K atlas request when WebGL initializes.
     if(reduced.matches){cameraState={...to};transition=null;renderOnce();}
     else start();
@@ -261,7 +264,8 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         const w=Math.max(1,Math.round(canvasRect.width)),h=Math.max(1,Math.round(canvasRect.height));
         camera.left=-w/2;camera.right=w/2;camera.top=h/2;camera.bottom=-h/2;
         camera.updateProjectionMatrix();
-        renderQuality=cinematicPixelRatio(w,h,window.devicePixelRatio||1,gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
+        const desiredRatio=balancedPixelRatio(w,h,window.devicePixelRatio||1,gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
+        renderQuality=qualityPromoted?desiredRatio:Math.min(1.25,desiredRatio);
         renderer.setPixelRatio(renderQuality);
         renderer.setSize(w,h,false);
         positionDom(elapsed);
@@ -277,12 +281,11 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       root._cleanupSolarLayout=()=>window.removeEventListener('resize',syncLayout);
       updateVisibleBodies();
       webglReady=true;
-      // Option A: request all ten planetary atlases simultaneously at 4K.
-      // A blocked image host retains a procedural 4K fallback.
+      // Preserve 4K planet atlases but bound competing downloads and GPU uploads.
       const applyMap=(id,highRes)=>{
         const target=meshes.get(id);
         if(!highRes)return;
-        if(disposed||!webglReady||!target?.parent){highRes.dispose();return;}
+        if(disposed||!webglReady||!target?.parent){releaseAtlasTexture(highRes);return;}
         const old=target.material.map;
         target.material.map=highRes;
         target.material.color.set('#ffffff');
@@ -293,42 +296,73 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
           target.material.bumpScale=id==='mars'?.038:.024;
           target.material.needsUpdate=true;
         }
-        if(old && old!==highRes)old.dispose();
-        renderOnce();
+        if(old&&old!==highRes)releaseAtlasTexture(old);
+        // The next animation frame performs the upload; no forced extra render.
       };
       const fallbackMap=id=>{
         if(disposed||!webglReady)return;
-        try{applyMap(id,createSurfaceTexture(THREE,id,{width:4096}));}
-        catch(error){console.warn('Retaining color-only planet material:',id,error);}
-      };
-      for(const body of SOLAR_BODIES){
-        try{loadPlanetPhoto(THREE,body.id,texture=>applyMap(body.id,texture),()=>fallbackMap(body.id));}
-        catch(error){console.warn('4K atlas request failed:',body.id,error);fallbackMap(body.id);}
-      }
-      const earth=meshes.get('earth');
-      if(earth){
-        const applyClouds=texture=>{
-          if(disposed||!webglReady){texture?.dispose();return;}
-          try{addEarthClouds(THREE,earth,{texture,width:4096});renderOnce();}
-          catch(error){texture?.dispose();console.warn('Earth cloud layer unavailable:',error);}
-        };
-        try{loadCloudImage(THREE,applyClouds,()=>{
+        const work=()=>{
           if(disposed||!webglReady)return;
-          try{addEarthClouds(THREE,earth,{width:4096});renderOnce();}
-          catch(error){console.warn('Procedural clouds unavailable:',error);}
-        });}catch(error){console.warn('4K cloud request failed:',error);}
-        try{loadNightLights(THREE,texture=>{
-          if(disposed||!webglReady){texture.dispose();return;}
+          try{applyMap(id,createSurfaceTexture(THREE,id,{width:1024}));}
+          catch(error){console.warn('Retaining color-only planet material:',id,error);}
+        };
+        if(window.requestIdleCallback)window.requestIdleCallback(work,{timeout:1500});
+        else window.setTimeout(work,30);
+      };
+      const earth=meshes.get('earth');
+      const applyClouds=texture=>{
+        if(disposed||!webglReady){releaseAtlasTexture(texture);return;}
+        try{addEarthClouds(THREE,earth,{texture,width:4096,alphaMap:true});}
+        catch(error){releaseAtlasTexture(texture);console.warn('Earth cloud layer unavailable:',error);}
+      };
+      const applyNight=texture=>{
+        if(disposed||!webglReady){releaseAtlasTexture(texture);return;}
+        try{
           const lights=addEarthNightLights(THREE,earth,texture);
           lights.material.uniforms.sunWorldPosition.value.set(world.position.x,world.position.y,world.position.z+48*worldScale);
-          renderOnce();
-        },error=>console.warn('City-light atlas unavailable:',error));}
-        catch(error){console.warn('Night-lights request failed:',error);}
-      }
+        }catch(error){releaseAtlasTexture(texture);console.warn('City-light layer unavailable:',error);}
+      };
+      const queueIds=[INITIAL_BODY,...SOLAR_BODIES.map(body=>body.id).filter(id=>id!==INITIAL_BODY),'clouds','night'];
+      textureQueue=createTextureQueue(queueIds,{
+        maxConcurrent:2,delayMs:180,
+        load:id=>new Promise((resolve,reject)=>{
+          const ok=texture=>{
+            if(id==='clouds')applyClouds(texture);
+            else if(id==='night')applyNight(texture);
+            else applyMap(id,texture);
+            resolve();
+          };
+          try{
+            if(id==='clouds')loadCloudImage(THREE,ok,reject);
+            else if(id==='night')loadNightLights(THREE,ok,reject);
+            else loadPlanetPhoto(THREE,id,ok,reject);
+          }catch(error){reject(error);}
+        }),
+        failed:(id,error)=>{
+          if(disposed)return;
+          console.warn('High resolution atlas unavailable:',id,error);
+          if(id==='clouds'){
+            const cloudFallback=()=>{
+              if(disposed||!webglReady)return;
+              try{addEarthClouds(THREE,earth,{width:1024});}
+              catch(e){console.warn('Procedural clouds unavailable:',e);}
+            };
+            if(window.requestIdleCallback)window.requestIdleCallback(cloudFallback,{timeout:1800});
+            else window.setTimeout(cloudFallback,40);
+          }else if(id!=='night')fallbackMap(id);
+        }
+      });
       root.classList.add('has-three');root.classList.remove('solar-fallback');
       hero?.classList.add('has-three-background');
       if(focusedId)startCameraTransition(focusedId);
       renderOnce();start();
+      // Begin heavy texture work after the first interactive 3D frame.
+      textureQueue.start();
+      qualityTimer=window.setTimeout(()=>{
+        if(disposed||!webglReady)return;
+        qualityPromoted=true;
+        syncLayout();
+      },1400);
       canvas.addEventListener('webglcontextlost',event=>{
         event.preventDefault();webglReady=false;stop();root.classList.remove('has-three');
         root.classList.add('solar-fallback');hero?.classList.remove('has-three-background');
@@ -343,14 +377,15 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   if(!reduced.matches)initializeThree();else {root.classList.add('solar-fallback');renderOnce();}
   start();
   return ()=>{
-    disposed=true;stop();observer?.disconnect();resizeObserver?.disconnect();root._cleanupSolarLayout?.();
+    disposed=true;stop();textureQueue?.stop();if(qualityTimer!==null)clearTimeout(qualityTimer);
+    observer?.disconnect();resizeObserver?.disconnect();root._cleanupSolarLayout?.();
     hero?.classList.remove('has-three-background');
     document.removeEventListener('visibilitychange',onVisibility);
     reduced.removeEventListener?.('change',onMotion);
     if(threeModule){
       for(const mesh of meshes.values()){
-        mesh.material.map?.dispose?.();if(mesh.material.bumpMap!==mesh.material.map)mesh.material.bumpMap?.dispose?.();mesh.material.dispose();
-        for(const child of mesh.children){child.material?.map?.dispose?.();child.material?.uniforms?.nightMap?.value?.dispose?.();child.material?.dispose?.();child.geometry?.dispose?.();}
+        releaseAtlasTexture(mesh.material.map);if(mesh.material.bumpMap!==mesh.material.map)releaseAtlasTexture(mesh.material.bumpMap);mesh.material.dispose();
+        for(const child of mesh.children){releaseAtlasTexture(child.material?.map);releaseAtlasTexture(child.material?.alphaMap);releaseAtlasTexture(child.material?.uniforms?.nightMap?.value);child.material?.dispose?.();child.geometry?.dispose?.();}
       }
       stars?.geometry.dispose();stars?.material.dispose();
       // Sphere geometry is shared, dispose it only once.
