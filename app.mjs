@@ -1,5 +1,4 @@
 import { initSolarSystem } from './solar-system.mjs';
-import { initGeneralQuiz } from './quiz-ui.mjs';
 import { initAmbientAudio } from './ambient-audio.mjs';
 
 const $ = (selector, context = document) => context.querySelector(selector);
@@ -180,10 +179,46 @@ function initCopyEmail() {
   });
 }
 
+/** The offline quiz's curated question bank loads when visitors approach it,
+ * keeping an optional 28 KB module out of the homepage's critical path. */
+function initDeferredQuiz(){
+  const root=document.getElementById('general-quiz');
+  if(!root)return;
+  let loaded=null,observer=null;
+  const form=root.querySelector('#quiz-form');
+  const load=()=>{
+    observer?.disconnect();
+    if(!loaded)loaded=import('./quiz-ui.mjs').then(({initGeneralQuiz})=>{
+      form?.removeEventListener('submit',earlySubmit);
+      initGeneralQuiz(root);
+      return true;
+    }).catch(error=>{
+      console.error('Could not initialize technology quiz:',error);
+      const status=document.getElementById('quiz-status');
+      if(status)status.textContent='Quiz temporarily unavailable. Refresh to retry.';
+      loaded=null;
+      return false;
+    });
+    return loaded;
+  };
+  // If someone submits immediately, wait for the module rather than navigate.
+  const earlySubmit=event=>{
+    event.preventDefault();
+    void load().then(ok=>{if(ok)form?.requestSubmit?.();});
+  };
+  form?.addEventListener('submit',earlySubmit);
+  if('IntersectionObserver' in window){
+    observer=new IntersectionObserver(entries=>{
+      if(entries.some(entry=>entry.isIntersecting))void load();
+    },{rootMargin:'650px 0px'});
+    observer.observe(root);
+  }else{void load();}
+}
+
 /** Feature isolation: broken optional interactions must not hide résumé content. */
 for (const [name, setup] of [
   ['menu', initMenu], ['filters', initFilters], ['quick navigation', initCommandPalette],
-  ['solar system', initSolarSystem], ['ambient soundtrack', initAmbientAudio], ['knowledge arcade', initGeneralQuiz], ['web design lab', initDesignLab], ['copy email', initCopyEmail],
+  ['solar system', initSolarSystem], ['ambient soundtrack', initAmbientAudio], ['knowledge arcade', initDeferredQuiz], ['web design lab', initDesignLab], ['copy email', initCopyEmail],
 ]) {
   try { setup(); } catch (error) { console.error(`Could not initialize ${name}:`, error); }
 }

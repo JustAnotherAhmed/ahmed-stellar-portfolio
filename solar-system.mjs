@@ -2,6 +2,7 @@ import {SOLAR_BODIES,ORBITAL_BODIES,BODY_BY_ID,INITIAL_BODY,positionsAt} from '.
 import {CAMERA_OVERVIEW,FOCUS_DURATION_MS,focusZoomFor,sampleCamera,transitionCamera} from './camera-focus.mjs';
 import {createSurfaceTexture,createAtmosphere,addRings,addEarthClouds,loadPlanetPhoto} from './planet-textures.mjs';
 import {effectivePixelRatio,sceneAnchoring,satelliteSafeZoom,anchoredCameraOffset} from './render-quality.mjs';
+import {frameIntervalFor,MARKER_INTERVAL_MS,dueForUpdate} from './performance.mjs';
 
 /**
  * Hybrid orrery. Transparent Three.js stage and accessible SVG/DOM markers share a 440-unit
@@ -25,8 +26,9 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   let threeModule=null,transition=null,focusedId=null,active=INITIAL_BODY;
   let cameraState={...CAMERA_OVERVIEW},cameraParallax={x:0,y:0},desiredParallax={x:0,y:0};
   const meshes=new Map(),markerMap=new Map(),pickerMap=new Map();
-  let disposed=false,renderQuality=1;
+  let disposed=false,renderQuality=1,markerScale=1,lastMarkersAt=0,textureIdleHandle=null,frameInterval=1000/60;
   const positions=()=>positionsAt(elapsed);
+  markerScale=Math.max(.01,stage.getBoundingClientRect().width/440);
   function closeupZoom(body){
     const preferred=focusZoomFor(body);
     if(body?.id!=='earth')return preferred;
@@ -106,7 +108,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
 
   function positionDom(t) {
     const locations=positionsAt(t);
-    const factor=stage.getBoundingClientRect().width/440;
+    const factor=markerScale;
     for(const [id,button] of markerMap){
       const p=locations[id];button.style.left=`calc(50% + ${p.x*factor}px)`;button.style.top=`calc(50% - ${p.y*factor}px)`;
       button.style.zIndex=String(8+Math.round(p.z));
@@ -182,7 +184,12 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     camera.zoom=cameraState.zoom;camera.updateProjectionMatrix();
   }
   function paint(nowMs,dt){
-    positionDom(elapsed);
+    // Accessible planet markers need fewer DOM updates than WebGL render passes.
+    // Avoid forcing a layout read and 20+ style writes every frame.
+    if(dueForUpdate(nowMs,lastMarkersAt,MARKER_INTERVAL_MS) || dt===0){
+      positionDom(elapsed);
+      lastMarkersAt=nowMs;
+    }
     if(!webglReady||!renderer)return;
     const locations=updateMeshes(dt);
     updateCamera(nowMs,dt,locations);
@@ -192,6 +199,9 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   function tick(now){
     raf=0;
     if(!motion.visible||!motion.intersecting||!motion.enabled)return;
+    if(!dueForUpdate(now,last,frameInterval)){
+      raf=requestAnimationFrame(tick);return;
+    }
     const dt=last?Math.min(.05,(now-last)/1000):0;
     last=now;elapsed+=dt;
     paint(now,dt);
@@ -238,9 +248,10 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       world.add(new THREE.AmbientLight(0xb4cae8,.57));
       const sunlight=new THREE.PointLight(0xffdfb1,62,0,0);
       sunlight.position.set(0,0,48);world.add(sunlight);
-      const geometry=new THREE.SphereGeometry(1,128,96);
+      // Reuse one detailed sphere geometry; upload color placeholders first.
+      const geometry=new THREE.SphereGeometry(1,96,72);
       for(const body of SOLAR_BODIES){
-        const texture=createSurfaceTexture(THREE,body.id,{width:body.id===INITIAL_BODY?1024:512});
+        const texture=null; // First paint is immediate; idle tasks supply detailed textures.
         const material=body.id==='sun'
           ?new THREE.MeshBasicMaterial({map:texture||null,color:texture?'#ffffff':body.color})
           :new THREE.MeshStandardMaterial({map:texture||null,color:texture?'#ffffff':body.color,
@@ -252,7 +263,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         if(['earth','venus','uranus','neptune','sun'].includes(body.id)){
           mesh.add(createAtmosphere(THREE,body.glow,body.id==='sun'?.45:.5));
         }
-        if(body.id==='earth')addEarthClouds(THREE,mesh);
+        // Earth clouds also render later as an idle texture task.
         addRings(THREE,mesh,body.id);
       }
       const coords=[],starGeometry=new THREE.BufferGeometry();
@@ -270,6 +281,8 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         if(canvasRect.width<1 || canvasRect.height<1 || stageRect.width<1)return;
         const frame=sceneAnchoring(canvasRect,stageRect);
         worldScale=frame.scale;
+        markerScale=frame.scale;
+        frameInterval=frameIntervalFor(window.innerWidth,window.navigator?.deviceMemory ?? 8);
         world.scale.setScalar(worldScale);
         world.position.set(frame.x,frame.y,0);
         const w=Math.max(1,Math.round(canvasRect.width)),h=Math.max(1,Math.round(canvasRect.height));
@@ -291,10 +304,39 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       root._cleanupSolarLayout=()=>window.removeEventListener('resize',syncLayout);
       updateVisibleBodies();
       webglReady=true;
+      // CPU-heavy procedural maps are generated after the first WebGL paint,
+      // one at a time between frames, instead of blocking initial interactivity.
+      const pending=[INITIAL_BODY,...SOLAR_BODIES.map(body=>body.id).filter(id=>id!==INITIAL_BODY),'earth-clouds'];
+      const nextTexture=()=>{
+        textureIdleHandle=null;
+        if(disposed || !webglReady)return;
+        const id=pending.shift();if(!id)return;
+        const target=meshes.get(id==='earth-clouds'?'earth':id);
+        if(id==='earth-clouds' && target && !target.userData.cloudsReady){
+          try{addEarthClouds(THREE,target);target.userData.cloudsReady=true;}
+          catch(error){console.warn('Keeping Earth without cloud overlay:',error);}
+        }else if(target && !target.userData.highRes){
+          try{
+            const map=createSurfaceTexture(THREE,id,{width:id===INITIAL_BODY?1024:512});
+            if(map && !target.userData.highRes){
+              const old=target.material.map;
+              target.material.map=map;target.material.needsUpdate=true;
+              old?.dispose?.();
+            }else map?.dispose?.();
+          }catch(error){console.warn('Keeping simplified planet material:',id,error);}
+          renderOnce();
+        }
+        if(pending.length)scheduleTexture();
+      };
+      function scheduleTexture(){
+        textureIdleHandle=window.requestIdleCallback
+          ?window.requestIdleCallback(nextTexture,{timeout:1600})
+          :window.setTimeout(nextTexture,80);
+      }
       root.classList.add('has-three');root.classList.remove('solar-fallback');
       hero?.classList.add('has-three-background');
       if(focusedId)startCameraTransition(focusedId);
-      renderOnce();start();
+      renderOnce();start();scheduleTexture();
       canvas.addEventListener('webglcontextlost',event=>{
         event.preventDefault();webglReady=false;stop();root.classList.remove('has-three');
         root.classList.add('solar-fallback');hero?.classList.remove('has-three-background');
@@ -312,6 +354,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     disposed=true;stop();observer?.disconnect();resizeObserver?.disconnect();root._cleanupSolarLayout?.();
     hero?.classList.remove('has-three-background');
     if(textureUpgrade!==null){if(window.cancelIdleCallback)window.cancelIdleCallback(textureUpgrade);else clearTimeout(textureUpgrade);}
+    if(textureIdleHandle!==null){if(window.cancelIdleCallback)window.cancelIdleCallback(textureIdleHandle);else clearTimeout(textureIdleHandle);}
     document.removeEventListener('visibilitychange',onVisibility);
     reduced.removeEventListener?.('change',onMotion);
     if(threeModule){
