@@ -62,7 +62,8 @@ test('enabled default starts music on first interaction; uses UI and planet soun
   const doc=new FakeDoc(),engine=mockEngine(),stop=initAmbientAudio({doc,engineFactory:()=>engine});
   assert.equal(doc.button.getAttribute('aria-pressed'),'true');
   assert.equal(doc.button.label.textContent,'Sound on');
-  assert.deepEqual(engine.calls,[]);
+  await flush();
+  assert.deepEqual(engine.calls.slice(0,2),['volume:34','play']);
   doc.clickControl();await flush();
   assert.equal(doc.button.dataset.playing,'true');
   assert.deepEqual(engine.calls.slice(0,3),['volume:34','play','effect:ui']);
@@ -106,11 +107,12 @@ test('Web Audio start failure does not break the site and can retry',async()=>{
   const stop=initAmbientAudio({doc,engineFactory:()=>({
     setVolume(){},playEffect(){},async play(){attempts++;if(attempts===1)throw Error('NotAllowedError');},async pause(){},async dispose(){}
   })});
-  doc.press('Enter');await flush();
+  await flush();
   assert.equal(doc.button.dataset.playing,'false');
   assert.match(doc.status.textContent,/browser requires/i);
-  doc.clickControl({planet:'venus'});await flush();
+  doc.press('Enter');await flush();
   assert.equal(doc.button.dataset.playing,'true');
+  doc.clickControl({planet:'venus'});await flush();
   stop();
 });
 test('browser autoplay permission can start soundtrack immediately',async()=>{
@@ -118,5 +120,50 @@ test('browser autoplay permission can start soundtrack immediately',async()=>{
   doc.defaultView.navigator={getAutoplayPolicy:()=> 'allowed'};
   const stop=initAmbientAudio({doc,engineFactory:()=>engine});
   await flush();assert.ok(engine.calls.includes('play'));
+  stop();
+});
+
+test('mobile touchstart unlocks a pending autoplay request without the sound button',async()=>{
+  const doc=new FakeDoc(),calls=[];let finish;
+  const engine={
+    setVolume(value){calls.push('volume:'+value);},
+    async play(){calls.push('play');await new Promise(resolve=>{finish=resolve;});},
+    unlock(){calls.push('unlock');finish?.();},
+    async pause(){calls.push('pause');},
+    playEffect(){},
+    async dispose(){}
+  };
+  const stop=initAmbientAudio({doc,engineFactory:()=>engine});
+  await flush();
+  assert.equal(doc.button.getAttribute('aria-pressed'),'true');
+  assert.equal(doc.button.dataset.playing,'false');
+  doc.dispatchEvent(new Event('touchstart'));await flush();
+  assert.ok(calls.includes('unlock'));
+  assert.equal(doc.button.dataset.playing,'true');
+  stop();
+});
+test('touchend and pointerdown can unlock soundtrack without clicking a control',async()=>{
+  const doc=new FakeDoc(),engine=mockEngine();
+  const stop=initAmbientAudio({doc,engineFactory:()=>engine});
+  await flush();
+  assert.equal(engine.calls.filter(x=>x==='play').length,1);
+  doc.dispatchEvent(new Event('pointerdown'));
+  doc.dispatchEvent(new Event('touchend'));await flush();
+  assert.equal(doc.button.dataset.playing,'true');
+  assert.equal(engine.calls.filter(x=>x==='play').length,1);
+  stop();
+});
+test('remembered mute blocks load-time autoplay and every mobile gesture',async()=>{
+  const doc=new FakeDoc(),engine=mockEngine();
+  doc.defaultView.localStorage.setItem(AUDIO_PREFERENCE_KEY,'off');
+  const stop=initAmbientAudio({doc,engineFactory:()=>engine});
+  await flush();
+  for(const type of ['pointerdown','touchstart','touchend'])
+    doc.dispatchEvent(new Event(type));
+  doc.hidden=true;doc.dispatchEvent(new Event('visibilitychange'));
+  doc.hidden=false;doc.dispatchEvent(new Event('visibilitychange'));
+  await flush();
+  assert.deepEqual(engine.calls,[]);
+  assert.equal(doc.button.getAttribute('aria-pressed'),'false');
   stop();
 });

@@ -70,14 +70,14 @@
      </a>
     </nav>
     <div class="ambient-controls" role="group" aria-label="Original ambient space soundtrack">
-     <button class="ambient-toggle" id="ambient-toggle" type="button" aria-label="Turn website sounds off" aria-pressed="true" data-playing="false" data-enabled="true" title="Orbital Drift — enabled by default; starts on first interaction if browser autoplay is blocked">
+     <button class="ambient-toggle" id="ambient-toggle" type="button" aria-label="Turn website sounds off" aria-pressed="true" data-playing="false" data-enabled="true" title="Orbital Drift — starts automatically when permitted, otherwise on your first touch or tap">
       <span class="ambient-symbol" aria-hidden="true">♫</span>
       <span class="ambient-label" data-ambient-label>Sound on</span>
       <span class="ambient-bars" aria-hidden="true"><i></i><i></i><i></i></span>
      </button>
      <label class="visually-hidden" for="ambient-volume">Ambient soundtrack volume</label>
      <input class="ambient-volume" id="ambient-volume" type="range" min="0" max="100" value="34" step="1" aria-label="Ambient soundtrack volume"/>
-     <span class="visually-hidden" id="ambient-status" role="status" aria-live="polite">Sound on by default; browsers may require a first click to begin playback.</span>
+     <span class="visually-hidden" id="ambient-status" role="status" aria-live="polite">Sound on by default; some browsers require your first touch, scroll or tap to begin playback.</span>
     </div>
     <button aria-label="Open quick navigation, Control or Command K" class="command-trigger" id="command-trigger" type="button">
      <span aria-hidden="true" class="command-trigger__icon">
