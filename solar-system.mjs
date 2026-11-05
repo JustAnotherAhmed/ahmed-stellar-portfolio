@@ -45,11 +45,11 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   moonTrack.setAttribute('class','solar-track solar-track--moon');moonTrack.setAttribute('r','13');svg.append(moonTrack);
   for(const body of SOLAR_BODIES){
     const button=document.createElement('button');button.type='button';button.className='solar-hit';
-    button.dataset.body=body.id;button.setAttribute('aria-label',`Focus on ${body.name}`);
+    button.dataset.body=body.id;button.dataset.planetSound=body.id;button.setAttribute('aria-label',`Focus on ${body.name}`);
     button.style.setProperty('--body-color',body.color);
     button.innerHTML=body.id==='sun'?'<span class="solar-hit__dot solar-hit__sun" aria-hidden="true">✦</span>':'<span class="solar-hit__dot" aria-hidden="true"></span>';
     button.addEventListener('click',()=>select(body.id,true));markers.append(button);markerMap.set(body.id,button);
-    const pick=document.createElement('button');pick.type='button';pick.className='planet-chip';pick.dataset.body=body.id;
+    const pick=document.createElement('button');pick.type='button';pick.className='planet-chip';pick.dataset.body=body.id;pick.dataset.planetSound=body.id;
     pick.style.setProperty('--body-color',body.color);
     const symbol=document.createElement('span');symbol.className='planet-chip__orb';symbol.setAttribute('aria-hidden','true');
     const name=document.createElement('span');name.textContent=body.name;pick.append(symbol,name);

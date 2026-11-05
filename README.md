@@ -109,3 +109,19 @@ third-party music licenses, backend, network requests, or API keys are needed.
   accessible even when the visual volume slider is hidden.
 - Run `node --test *.test.mjs`; this includes original score data, voluntary
   playback, pause/volume behaviour, browser visibility and failure/retry tests.
+
+## Sound preference, planetary effects and career targeting
+
+The original **Orbital Drift** soundtrack is enabled by default. Modern browsers
+may block actual playback until a visitor's first click or keypress; the UI
+reports that state without bypassing browser restrictions. After activation,
+playback pauses when a tab is hidden and resumes when visible again, except
+when the visitor manually muted it. The shared switch and volume slider govern
+both ambient playback and sound effects. Mute choice persists in localStorage
+where available. The Sun, eight planets, and Moon each have distinct synthesized
+cues; other clickable controls use a subtle universal click. No paid APIs,
+external audio assets, or licensed recordings are needed.
+
+The hero and About sections explicitly show the breadth of technical roles
+being pursued: AI engineering, automation, web development, IT support and
+closely related work. Run `node --test *.test.mjs` to check regressions.

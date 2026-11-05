@@ -613,3 +613,8 @@ body { overflow-x: clip; }
 @media(max-width:850px) {.ambient-controls{gap:3px}.ambient-volume{width:42px;max-width:42px;}}
 @media(max-width:580px) {.ambient-toggle{width:35px;min-width:35px;padding:7px}.ambient-label,.ambient-bars,.ambient-volume{display:none}.ambient-controls{gap:0}.nav-shell{gap:8px}.footer-domain{display:block;margin:6px 0 0}}
 @media(prefers-reduced-motion:reduce) {.ambient-toggle,.ambient-toggle .ambient-bars i{animation:none!important;transition:none!important;}}
+
+/* Recruiter-friendly, responsive career interests. */
+.career-opportunities{margin:17px 0 19px;max-width:620px;color:#dae5ff;font-size:12px;line-height:1.75;letter-spacing:.005em;}
+.career-opportunities span{display:inline-block;margin-right:9px;color:#f8d09a;font:700 10px 'Cascadia Code',Consolas,monospace;letter-spacing:.07em;}
+@media(max-width:580px){.career-opportunities{font-size:11px;line-height:1.65;margin:12px 0 18px;}}
