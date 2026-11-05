@@ -15,13 +15,13 @@ test('the WebGL scene fills the hero and exposes 4K renderer quality',()=>{
   assert.match(html,/<div class="solar-background" aria-hidden="true"><canvas id="solar-canvas"/);
   assert.match(css,/\.solar-background[^{]*\{[^}]*width:\s*100vw/);
   assert.doesNotMatch(js,/renderer\.setSize\(440,440/);
-  assert.match(js,/balancedPixelRatio/);
+  assert.match(js,/cinematicPixelRatio/);
   assert.match(js,/updateVisibleBodies/);
 });
 test('failed remote 4K maps retain procedural 4K fallback',()=>{
   const js=read('./solar-system.mjs');
   assert.match(js,/loadPlanetPhoto\(THREE,id,ok,reject\)/);
-  assert.match(js,/createSurfaceTexture\(THREE,id,\{width:1024\}\)/);
+  assert.match(js,/createSurfaceTexture\(THREE,id,\{width:4096\}\)/);
   const cfg=JSON.parse(read('./vercel.json'));
   const csp=cfg.headers[0].headers.find(h=>h.key==='Content-Security-Policy').value;
   assert.match(csp,/https:\/\/www\.solarsystemscope\.com/);

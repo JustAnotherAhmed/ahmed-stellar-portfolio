@@ -170,3 +170,10 @@ level, then reaches a GPU-budgeted high-DPI resolution. Network failures show
 procedural fallback art without an expensive 4K CPU loop. All sound, quiz, camera
 and portfolio features are unchanged. Run node --test '*.test.mjs' to verify.
 Real-world loading gains depend on device/network and are not guaranteed.
+
+
+## Full-resolution renderer (v11 — fidelity assurance)
+
+The planet imagery remains 4096 × 2048 equirectangular texture maps, with high-density meshes, 4K procedural rings, and 4K Earth clouds. The performance release (v10) briefly drew the WebGL canvas at 1.25× and imposed a 14-million-pixel framebuffer budget. Both renderer downshifts have been removed: the original v9 `cinematicPixelRatio` runs from the first 3D frame, limited only by the graphics hardware's maximum renderbuffer dimension. Failed remote atlas loads now use 4096-wide procedural planet and cloud maps rather than 1024-wide placeholders. **Actual source maps for Uranus and Neptune remain 2K**, and supersampling or upscaling cannot invent source detail. The progressive maximum-two-download texture queue and async 4K atlas decoding still protect initial interactivity; visual details become available as assets arrive. Full resolution requires WebGL, enough GPU memory, and a browser display capable of showing it. Quality-first rendering can reduce FPS or fail on weaker hardware.
+
+Test with `node --test *.test.mjs` and inspect a production build in a browser on real hardware.
