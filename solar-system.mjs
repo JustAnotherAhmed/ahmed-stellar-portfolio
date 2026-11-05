@@ -1,6 +1,7 @@
 import {SOLAR_BODIES,ORBITAL_BODIES,BODY_BY_ID,INITIAL_BODY,positionsAt} from './planets.mjs';
 import {CAMERA_OVERVIEW,FOCUS_DURATION_MS,focusZoomFor,sampleCamera,transitionCamera} from './camera-focus.mjs';
-import {createSurfaceTexture,createAtmosphere,addRings} from './planet-textures.mjs';
+import {createSurfaceTexture,createAtmosphere,addRings,addEarthClouds,loadPlanetPhoto} from './planet-textures.mjs';
+import {effectivePixelRatio,sceneAnchoring,satelliteSafeZoom} from './render-quality.mjs';
 
 /**
  * Hybrid orrery. Transparent Three.js stage and accessible SVG/DOM markers share a 440-unit
@@ -9,21 +10,30 @@ import {createSurfaceTexture,createAtmosphere,addRings} from './planet-textures.
  */
 export function initSolarSystem(root=document.getElementById('solar-system')) {
   if(!root)return ()=>{};
-  const $=s=>root.querySelector(s),canvas=$('#solar-canvas'),svg=$('#solar-orbits');
+  const $=s=>root.querySelector(s),canvas=document.getElementById('solar-canvas'),svg=$('#solar-orbits'),stage=$('.solar-stage');
   const markers=$('#solar-markers'),picker=document.getElementById('planet-picker');
   const status=$('#solar-status'),facts=$('#planet-fact'),kind=$('#planet-kind');
   const title=$('#planet-name'),display=$('#planet-display'),returnButton=$('#solar-return');
   const fallback=$('#solar-closeup'),fallbackName=$('#solar-closeup-name');
-  if(!canvas||!svg||!markers||!picker||!returnButton)return ()=>{};
+  if(!canvas||!svg||!stage||!markers||!picker||!returnButton)return ()=>{};
   const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
   const motion={enabled:!reduced.matches,visible:!document.hidden,intersecting:true};
   const NS='http://www.w3.org/2000/svg';
   let raf=0,last=0,elapsed=60,scene=null,camera=null,renderer=null,stars=null,webglReady=false;
+  const hero=canvas.closest('.hero');
+  let world=null,worldScale=1,textureUpgrade=null,resizeObserver=null;
   let threeModule=null,transition=null,focusedId=null,active=INITIAL_BODY;
   let cameraState={...CAMERA_OVERVIEW},cameraParallax={x:0,y:0},desiredParallax={x:0,y:0};
   const meshes=new Map(),markerMap=new Map(),pickerMap=new Map();
-  let disposed=false;
+  let disposed=false,renderQuality=1;
   const positions=()=>positionsAt(elapsed);
+  function closeupZoom(body){
+    const preferred=focusZoomFor(body);
+    if(body?.id!=='earth')return preferred;
+    const backdrop=canvas.getBoundingClientRect(),rect=stage.getBoundingClientRect();
+    const x=rect.left+rect.width/2;
+    return satelliteSafeZoom(preferred,backdrop,x,Math.max(.01,rect.width/440),17);
+  }
 
   svg.setAttribute('viewBox','0 0 440 440');
   for(const body of ORBITAL_BODIES){
@@ -61,8 +71,10 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       fallbackName.textContent=body.name;
     }
     const p=nextId?positions()[nextId]:{x:0,y:0};
-    const to=nextId?{x:p.x,y:p.y,zoom:focusZoomFor(body)}:CAMERA_OVERVIEW;
+    const to=nextId?{x:p.x,y:p.y,zoom:closeupZoom(body)}:CAMERA_OVERVIEW;
     transition=transitionCamera(cameraState,to,performance.now(),reduced.matches?1:FOCUS_DURATION_MS);
+    updateVisibleBodies();
+    if(nextId)queueTextureUpgrade(nextId);
     if(reduced.matches){cameraState={...to};transition=null;renderOnce();}
     else start();
   }
@@ -94,12 +106,47 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
 
   function positionDom(t) {
     const locations=positionsAt(t);
+    const factor=stage.getBoundingClientRect().width/440;
     for(const [id,button] of markerMap){
-      const p=locations[id];button.style.left=`calc(50% + ${p.x}px)`;button.style.top=`calc(50% - ${p.y}px)`;
+      const p=locations[id];button.style.left=`calc(50% + ${p.x*factor}px)`;button.style.top=`calc(50% - ${p.y*factor}px)`;
       button.style.zIndex=String(8+Math.round(p.z));
     }
     moonTrack.setAttribute('cx',String(locations.earth.x+220));
     moonTrack.setAttribute('cy',String(220-locations.earth.y));
+  }
+  function updateVisibleBodies(){
+    for(const [id,mesh] of meshes){
+      mesh.visible=!focusedId || id===focusedId || (focusedId==='earth' && id==='moon');
+    }
+  }
+  function queueTextureUpgrade(id){
+    if(!webglReady || !renderer || !threeModule || window.innerWidth<760)return;
+    const target=meshes.get(id);
+    if(!target || target.userData.highRes||target.userData.loadingPhoto)return;
+    if(textureUpgrade!==null){
+      if(window.cancelIdleCallback)window.cancelIdleCallback(textureUpgrade);
+      else clearTimeout(textureUpgrade);
+    }
+    const work=()=>{
+      textureUpgrade=null;
+      if(disposed || !webglReady || !renderer || !target || target.userData.highRes)return;
+      target.userData.loadingPhoto=true;
+      const replaceMap=highRes=>{
+        if(!highRes)return;
+        if(disposed||!target.parent){highRes.dispose();return;}
+        const previous=target.material.map;
+        target.material.map=highRes;target.material.needsUpdate=true;
+        target.userData.highRes=true;target.userData.loadingPhoto=false;
+        previous?.dispose?.();renderOnce();
+      };
+      const fallback=()=>{
+        if(disposed||!target.parent)return;
+        try{ replaceMap(createSurfaceTexture(threeModule,id,{width:2048})); }
+        catch(err){console.warn('Retaining standard-resolution planet texture:',err);target.userData.loadingPhoto=false;}
+      };
+      loadPlanetPhoto(threeModule,id,replaceMap,fallback);
+    };
+    textureUpgrade=window.requestIdleCallback?window.requestIdleCallback(work,{timeout:1400}):window.setTimeout(work,140);
   }
   function updateMeshes(dt){
     const locations=positions();
@@ -113,7 +160,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     if(!camera)return;
     const movingTarget=focusedId?locations[focusedId]:{x:0,y:0};
     if(transition){
-      const target={x:movingTarget.x,y:movingTarget.y,zoom:focusedId?focusZoomFor(BODY_BY_ID[focusedId]):1};
+      const target={x:movingTarget.x,y:movingTarget.y,zoom:focusedId?closeupZoom(BODY_BY_ID[focusedId]):1};
       const result=sampleCamera(transition,nowMs,target);
       cameraState={x:result.x,y:result.y,zoom:result.zoom};
       if(result.complete)transition=null;
@@ -126,8 +173,10 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     cameraParallax.y+=(desiredParallax.y-cameraParallax.y)*k;
     const px=focusedId?cameraParallax.x*.10:cameraParallax.x;
     const py=focusedId?cameraParallax.y*.10:cameraParallax.y;
-    camera.position.set(cameraState.x+px,cameraState.y+py,520);
-    camera.lookAt(cameraState.x,cameraState.y,0);
+    const offsetX=cameraState.x*worldScale+px;
+    const offsetY=cameraState.y*worldScale+py;
+    camera.position.set(offsetX,offsetY,700);
+    camera.lookAt(offsetX,offsetY,0);
     camera.zoom=cameraState.zoom;camera.updateProjectionMatrix();
   }
   function paint(nowMs,dt){
@@ -172,66 +221,101 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   async function initializeThree(){
     try{
       if(!window.WebGL2RenderingContext)throw Error('WebGL2 is not available');
-      const gl=canvas.getContext('webgl2',{alpha:true,antialias:true,powerPreference:'low-power'});
+      const gl=canvas.getContext('webgl2',{alpha:true,antialias:true,powerPreference:'high-performance'});
       if(!gl)throw Error('WebGL context initialization failed');
       const THREE=await import('https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js');
       if(disposed||!canvas.isConnected)return;
       threeModule=THREE;
       scene=new THREE.Scene();
-      camera=new THREE.OrthographicCamera(-220,220,220,-220,1,1200);
-      camera.position.set(0,0,520);
-      renderer=new THREE.WebGLRenderer({canvas,context:gl,alpha:true,antialias:true,powerPreference:'low-power'});
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
-      renderer.setSize(440,440,false);renderer.outputColorSpace=THREE.SRGBColorSpace;
-      scene.add(new THREE.AmbientLight(0xd9e2f5,.68));
-      const sunlight=new THREE.PointLight(0xffefd4,4800,0,2);sunlight.position.set(0,0,24);scene.add(sunlight);
-      const geometry=new THREE.SphereGeometry(1,72,48);
+      camera=new THREE.OrthographicCamera(-220,220,220,-220,1,1800);
+      renderer=new THREE.WebGLRenderer({canvas,context:gl,alpha:true,antialias:true,powerPreference:'high-performance'});
+      renderer.outputColorSpace=THREE.SRGBColorSpace;
+      renderer.toneMapping=THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure=1.35;
+      world=new THREE.Group();scene.add(world);
+      world.add(new THREE.AmbientLight(0xb4cae8,.57));
+      const sunlight=new THREE.PointLight(0xffdfb1,62,0,0);
+      sunlight.position.set(0,0,48);world.add(sunlight);
+      const geometry=new THREE.SphereGeometry(1,128,96);
       for(const body of SOLAR_BODIES){
-        const texture=createSurfaceTexture(THREE,body.id);
+        const texture=createSurfaceTexture(THREE,body.id,{width:body.id===INITIAL_BODY?1024:512});
         const material=body.id==='sun'
           ?new THREE.MeshBasicMaterial({map:texture||null,color:texture?'#ffffff':body.color})
-          :new THREE.MeshStandardMaterial({map:texture||null,color:texture?'#ffffff':body.color,roughness:body.id==='earth'?.76:1,metalness:0});
+          :new THREE.MeshStandardMaterial({map:texture||null,color:texture?'#ffffff':body.color,
+             roughness:body.id==='earth'?.82:1,metalness:0});
         const mesh=new THREE.Mesh(geometry,material);
         mesh.scale.setScalar(body.size*.75);
-        scene.add(mesh);meshes.set(body.id,mesh);
+        mesh.rotation.z=body.id==='uranus' ? Math.PI*.46 : body.id==='saturn' ? .12 : 0;
+        world.add(mesh);meshes.set(body.id,mesh);
         if(['earth','venus','uranus','neptune','sun'].includes(body.id)){
-          mesh.add(createAtmosphere(THREE,body.glow,body.id==='sun'?.65:.47));
+          mesh.add(createAtmosphere(THREE,body.glow,body.id==='sun'?.45:.5));
         }
+        if(body.id==='earth')addEarthClouds(THREE,mesh);
         addRings(THREE,mesh,body.id);
       }
       const coords=[],starGeometry=new THREE.BufferGeometry();
-      for(let i=0;i<190;i++){
-        const angle=i*2.39996322972865,radius=Math.sqrt((i+1)/190)*315;
-        coords.push(Math.cos(angle)*radius,Math.sin(angle)*radius,-140+(i*31)%250);
+      for(let i=0;i<480;i++){
+        const a=(i*.6180339887)%1,b=(i*.7548776662)%1;
+        coords.push((a-.5)*3100,(b-.5)*1800,-190-((i*47)%320));
       }
       starGeometry.setAttribute('position',new THREE.Float32BufferAttribute(coords,3));
-      stars=new THREE.Points(starGeometry,new THREE.PointsMaterial({color:0xb2c9fd,size:1.1,sizeAttenuation:false,transparent:true,opacity:.70}));
+      stars=new THREE.Points(starGeometry,new THREE.PointsMaterial({
+         color:0xbbceef,size:1.1,sizeAttenuation:false,transparent:true,opacity:.58}));
       scene.add(stars);
+      function syncLayout(){
+        if(disposed||!renderer||!camera||!world)return;
+        const canvasRect=canvas.getBoundingClientRect(),stageRect=stage.getBoundingClientRect();
+        if(canvasRect.width<1 || canvasRect.height<1 || stageRect.width<1)return;
+        const frame=sceneAnchoring(canvasRect,stageRect);
+        worldScale=frame.scale;
+        world.scale.setScalar(worldScale);
+        world.position.set(frame.x,frame.y,0);
+        const w=Math.max(1,Math.round(canvasRect.width)),h=Math.max(1,Math.round(canvasRect.height));
+        camera.left=-w/2;camera.right=w/2;camera.top=h/2;camera.bottom=-h/2;
+        camera.updateProjectionMatrix();
+        renderQuality=effectivePixelRatio(w,h,window.devicePixelRatio||1);
+        renderer.setPixelRatio(renderQuality);
+        renderer.setSize(w,h,false);
+        positionDom(elapsed);
+        renderOnce();
+      }
+      syncLayout();
+      resizeObserver=typeof ResizeObserver==='undefined'?null:new ResizeObserver(syncLayout);
+      resizeObserver?.observe(hero);resizeObserver?.observe(stage);
+      window.addEventListener('resize',syncLayout,{passive:true});
+      renderer.domElement.dataset.quality='responsive-high-dpi';
+      renderer.domElement.dataset.resolution=String(Math.round(canvas.width))+'×'+String(Math.round(canvas.height));
+      renderer.domElement.dataset.renderScale=renderQuality.toFixed(2);
+      root._cleanupSolarLayout=()=>window.removeEventListener('resize',syncLayout);
+      updateVisibleBodies();
       webglReady=true;
       root.classList.add('has-three');root.classList.remove('solar-fallback');
+      hero?.classList.add('has-three-background');
       if(focusedId)startCameraTransition(focusedId);
       renderOnce();start();
       canvas.addEventListener('webglcontextlost',event=>{
         event.preventDefault();webglReady=false;stop();root.classList.remove('has-three');
-        root.classList.add('solar-fallback');
+        root.classList.add('solar-fallback');hero?.classList.remove('has-three-background');
         status.textContent='Graphics temporarily unavailable. Interactive 2D planet explorer remains available.';
       });
     }catch(error){
       console.warn('Using 2D planet fallback:',error);
-      root.classList.add('solar-fallback');
+      root.classList.add('solar-fallback');hero?.classList.remove('has-three-background');
       status.textContent='Accessible 2D planet explorer ready.';
     }
   }
   if(!reduced.matches)initializeThree();else {root.classList.add('solar-fallback');renderOnce();}
   start();
   return ()=>{
-    disposed=true;stop();observer?.disconnect();
+    disposed=true;stop();observer?.disconnect();resizeObserver?.disconnect();root._cleanupSolarLayout?.();
+    hero?.classList.remove('has-three-background');
+    if(textureUpgrade!==null){if(window.cancelIdleCallback)window.cancelIdleCallback(textureUpgrade);else clearTimeout(textureUpgrade);}
     document.removeEventListener('visibilitychange',onVisibility);
     reduced.removeEventListener?.('change',onMotion);
     if(threeModule){
       for(const mesh of meshes.values()){
         mesh.material.map?.dispose?.();mesh.material.dispose();
-        for(const child of mesh.children){child.material?.dispose?.();child.geometry?.dispose?.();}
+        for(const child of mesh.children){child.material?.map?.dispose?.();child.material?.dispose?.();child.geometry?.dispose?.();}
       }
       stars?.geometry.dispose();stars?.material.dispose();
       // Sphere geometry is shared, dispose it only once.
