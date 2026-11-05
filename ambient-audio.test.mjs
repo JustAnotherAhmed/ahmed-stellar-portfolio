@@ -61,7 +61,7 @@ test('distinctive planet cues and safe stored preference',()=>{
 test('enabled default starts music on first interaction; uses UI and planet sounds',async()=>{
   const doc=new FakeDoc(),engine=mockEngine(),stop=initAmbientAudio({doc,engineFactory:()=>engine});
   assert.equal(doc.button.getAttribute('aria-pressed'),'true');
-  assert.equal(doc.button.label.textContent,'Sound on');
+  assert.equal(doc.button.label.textContent,'Play sound');
   await flush();
   assert.deepEqual(engine.calls.slice(0,2),['volume:34','play']);
   doc.clickControl();await flush();
@@ -165,5 +165,44 @@ test('remembered mute blocks load-time autoplay and every mobile gesture',async(
   await flush();
   assert.deepEqual(engine.calls,[]);
   assert.equal(doc.button.getAttribute('aria-pressed'),'false');
+  stop();
+});
+
+test('first press on a pending sound button starts playback without muting preference',async()=>{
+  const doc=new FakeDoc(),calls=[];let resolvePlay;
+  const engine={
+    setVolume(v){calls.push('volume:'+v);},
+    async play(){calls.push('play');await new Promise(resolve=>{resolvePlay=resolve;});},
+    unlock(){calls.push('unlock');resolvePlay?.();},
+    async pause(){calls.push('pause');},playEffect(){},async dispose(){}
+  };
+  const stop=initAmbientAudio({doc,engineFactory:()=>engine});
+  await flush();
+  assert.equal(doc.button.getAttribute('aria-label'),'Start website soundtrack');
+  doc.button.click();await flush();
+  assert.ok(calls.includes('unlock'));
+  assert.equal(doc.button.getAttribute('aria-pressed'),'true');
+  assert.equal(doc.button.dataset.playing,'true');
+  doc.button.click();await flush();
+  assert.equal(doc.defaultView.localStorage.getItem(AUDIO_PREFERENCE_KEY),'off');
+  stop();
+});
+test('mobile soundtrack can unlock from the cinematic loading screen',async()=>{
+  const doc=new FakeDoc(),calls=[];let resolvePlay;
+  doc.loaderAudio=new FakeNode();
+  doc.nodes['stellar-audio-start']=doc.loaderAudio;
+  const engine={
+    setVolume(v){calls.push('volume:'+v);},
+    async play(){calls.push('play');await new Promise(resolve=>{resolvePlay=resolve;});},
+    unlock(){calls.push('unlock');resolvePlay?.();},
+    async pause(){},playEffect(){},async dispose(){}
+  };
+  const stop=initAmbientAudio({doc,engineFactory:()=>engine});
+  await flush();
+  assert.equal(doc.loaderAudio.hidden,false);
+  doc.loaderAudio.click();await flush();
+  assert.ok(calls.includes('unlock'));
+  assert.equal(doc.loaderAudio.hidden,true);
+  assert.equal(doc.button.dataset.playing,'true');
   stop();
 });

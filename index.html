@@ -35,6 +35,7 @@
       <p id="stellar-loader-message" aria-live="polite">Loading high-resolution worlds…</p>
       <progress id="stellar-loader-meter" max="12" value="0">Preparing 4K scenery</progress>
       <p class="stellar-loader__hint">Full-resolution textures, atmosphere and planetary details</p>
+      <button id="stellar-audio-start" class="stellar-loader__audio" type="button">♫ Tap to start soundtrack</button>
       <button id="stellar-loader-skip" class="stellar-loader__skip" type="button" hidden>Explore while loading</button>
     </div>
   </div>
@@ -174,6 +175,8 @@
      <div class="solar-stage">
       
       <svg id="solar-orbits" aria-hidden="true" class="solar-orbits" viewBox="0 0 440 440"></svg>
+      <div id="planet-rotation-pad" class="planet-rotation-pad" role="group" tabindex="0" aria-label="Rotate selected planet by dragging or using arrow keys" aria-describedby="planet-rotation-hint"></div>
+      <span id="planet-rotation-hint" class="planet-rotation-hint" aria-hidden="true">Drag or swipe to rotate · Arrow keys also work</span>
       <div class="solar-closeup" id="solar-closeup" data-body="earth" aria-hidden="true">
        <div class="solar-closeup__sphere"></div><span id="solar-closeup-name">Earth</span>
       </div>
