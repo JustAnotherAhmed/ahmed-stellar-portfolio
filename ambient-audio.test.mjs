@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {SOUNDTRACK_NAME,SPACE_CHORDS,SPACE_MELODY,DEFAULT_SOUND_VOLUME,normalizeVolume,midiToHz,initAmbientAudio,createAmbientEngine} from './ambient-audio.mjs';
+import {SOUNDTRACK_NAME,SPACE_CHORDS,SPACE_MELODY,DEFAULT_SOUND_VOLUME,normalizeVolume,midiToHz,initAmbientAudio,createAmbientEngine,CELESTIAL_CUES,UI_CLICK_CUE,getSoundProfile,readSoundPreference,saveSoundPreference,AUDIO_PREFERENCE_KEY} from './ambient-audio.mjs';
 
 const flush = () => new Promise(resolve => setTimeout(resolve, 5));
 class FakeNode extends EventTarget {
@@ -11,12 +11,22 @@ class FakeNode extends EventTarget {
   click(){this.dispatchEvent(new Event('click'));}
 }
 class FakeDoc extends EventTarget {
-  constructor(){super();this.hidden=false;this.button=new FakeNode();this.button.label=new FakeNode();this.slider=new FakeNode();this.status=new FakeNode();this.nodes={'ambient-toggle':this.button,'ambient-volume':this.slider,'ambient-status':this.status};this.defaultView=new EventTarget();}
+  constructor(){super();this.hidden=false;this.button=new FakeNode();this.button.label=new FakeNode();this.slider=new FakeNode();this.status=new FakeNode();this.nodes={'ambient-toggle':this.button,'ambient-volume':this.slider,'ambient-status':this.status};this.defaultView=new EventTarget();const data=new Map();this.defaultView.localStorage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,String(v))};}
   getElementById(name){return this.nodes[name];}
+  clickControl({planet=null,interactive=true}={}){
+    const target={dataset:planet?{planetSound:planet}:{},closest:selector=>{
+      if(selector.includes('#ambient-toggle'))return null;
+      if(selector==='[data-planet-sound]')return planet?target:null;
+      if(selector.includes('button, a'))return interactive?target:null;
+      return null;
+    }};
+    const event=new Event('click');Object.defineProperty(event,'target',{value:target});this.dispatchEvent(event);
+  }
+  press(key='Enter'){const event=new Event('keydown');Object.defineProperty(event,'key',{value:key});this.dispatchEvent(event);}
 }
 function mockEngine() {
   const calls=[];
-  return {calls, async play(){calls.push('play');},async pause(){calls.push('pause');},setVolume(v){calls.push('volume:'+v);},async dispose(){calls.push('dispose');}};
+  return {calls, async play(){calls.push('play');},async pause(){calls.push('pause');},setVolume(v){calls.push('volume:'+v);},playEffect(cue){calls.push('effect:'+cue);},async dispose(){calls.push('dispose');}};
 }
 test('original score includes four chords and an ordered melodic sequence',()=>{
   assert.equal(SOUNDTRACK_NAME,'Orbital Drift');
@@ -35,41 +45,78 @@ test('volume is clamped and handles invalid input safely',()=>{
 test('audio engine reports unavailable Web Audio gracefully',()=>{
   assert.throws(()=>createAmbientEngine({AudioContextCtor:null}),/Web Audio/);
 });
-test('soundtrack is silent until explicit click, toggles, and obeys volume control',async()=>{
-  const doc=new FakeDoc(),engine=mockEngine();
-  const stop=initAmbientAudio({doc,engineFactory:()=>engine});
-  assert.deepEqual(engine.calls,[]);
-  assert.equal(doc.button.getAttribute('aria-pressed'),'false');
-  assert.equal(doc.button.label.textContent,'Sound off');
-  doc.button.click();await flush();
+
+test('distinctive planet cues and safe stored preference',()=>{
+  const ids=['sun','mercury','venus','earth','moon','mars','jupiter','saturn','uranus','neptune'];
+  assert.deepEqual(Object.keys(CELESTIAL_CUES),ids);
+  assert.equal(new Set(ids.map(id=>getSoundProfile(id).notes.join(','))).size,10);
+  assert.equal(getSoundProfile('ui'),UI_CLICK_CUE);
+  const data=new Map(),store={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)};
+  assert.equal(readSoundPreference(store),true);
+  saveSoundPreference(store,false);
+  assert.equal(data.get(AUDIO_PREFERENCE_KEY),'off');
+  assert.equal(readSoundPreference(store),false);
+  assert.equal(readSoundPreference({getItem(){throw Error('blocked');}}),true);
+});
+test('enabled default starts music on first interaction; uses UI and planet sounds',async()=>{
+  const doc=new FakeDoc(),engine=mockEngine(),stop=initAmbientAudio({doc,engineFactory:()=>engine});
   assert.equal(doc.button.getAttribute('aria-pressed'),'true');
   assert.equal(doc.button.label.textContent,'Sound on');
-  assert.deepEqual(engine.calls.slice(0,2),['volume:34','play']);
-  doc.slider.value='22'; doc.slider.dispatchEvent(new Event('input'));
+  assert.deepEqual(engine.calls,[]);
+  doc.clickControl();await flush();
+  assert.equal(doc.button.dataset.playing,'true');
+  assert.deepEqual(engine.calls.slice(0,3),['volume:34','play','effect:ui']);
+  doc.clickControl({planet:'earth'});await flush();
+  doc.clickControl({planet:'saturn'});await flush();
+  assert.deepEqual(engine.calls.filter(x=>x.startsWith('effect:')),['effect:ui','effect:earth','effect:saturn']);
+  doc.slider.value='22';doc.slider.dispatchEvent(new Event('input'));
   assert.ok(engine.calls.includes('volume:22'));
-  doc.button.click();await flush();
-  assert.equal(doc.button.getAttribute('aria-pressed'),'false');
-  assert.ok(engine.calls.includes('pause'));
-  stop(); assert.ok(engine.calls.includes('dispose'));
+  stop();assert.ok(engine.calls.includes('dispose'));
 });
-test('ambient music pauses when the browser tab becomes hidden',async()=>{
-  const doc=new FakeDoc(),engine=mockEngine();
-  const stop=initAmbientAudio({doc,engineFactory:()=>engine});
-  doc.button.click();await flush();
+test('background tab pauses and foreground automatically resumes when enabled',async()=>{
+  const doc=new FakeDoc(),engine=mockEngine(),stop=initAmbientAudio({doc,engineFactory:()=>engine});
+  doc.clickControl();await flush();
   doc.hidden=true;doc.dispatchEvent(new Event('visibilitychange'));await flush();
-  assert.equal(doc.button.getAttribute('aria-pressed'),'false');
-  assert.ok(doc.status.textContent.includes('left the tab'));
+  assert.equal(doc.button.dataset.playing,'false');
+  assert.equal(doc.button.getAttribute('aria-pressed'),'true');
+  assert.ok(engine.calls.includes('pause'));
+  doc.hidden=false;doc.dispatchEvent(new Event('visibilitychange'));await flush();
+  assert.equal(doc.button.dataset.playing,'true');
+  assert.equal(engine.calls.filter(x=>x==='play').length,2);
   stop();
 });
-test('audio start failure never blocks the page and provides a retry',async()=>{
-  const doc=new FakeDoc();let attempts=0;
-  const stop=initAmbientAudio({doc,engineFactory:()=>({
-    setVolume(){},async play(){attempts++;if(attempts===1)throw new Error('NotAllowedError');},async pause(){},async dispose(){}
-  })});
+test('manual mute survives tab switches and blocks UI/planet effects',async()=>{
+  const doc=new FakeDoc(),engine=mockEngine(),stop=initAmbientAudio({doc,engineFactory:()=>engine});
+  doc.clickControl();await flush();
   doc.button.click();await flush();
   assert.equal(doc.button.getAttribute('aria-pressed'),'false');
-  assert.match(doc.status.textContent,/could not start/i);
-  doc.button.click();await flush();
-  assert.equal(doc.button.getAttribute('aria-pressed'),'true');
+  assert.equal(doc.defaultView.localStorage.getItem(AUDIO_PREFERENCE_KEY),'off');
+  doc.hidden=true;doc.dispatchEvent(new Event('visibilitychange'));
+  doc.hidden=false;doc.dispatchEvent(new Event('visibilitychange'));await flush();
+  doc.clickControl({planet:'moon'});await flush();
+  assert.equal(engine.calls.filter(x=>x==='play').length,1);
+  assert.ok(!engine.calls.includes('effect:moon'));
+  stop();
+  const next=initAmbientAudio({doc,engineFactory:()=>mockEngine()});
+  assert.equal(doc.button.getAttribute('aria-pressed'),'false');
+  next();
+});
+test('Web Audio start failure does not break the site and can retry',async()=>{
+  const doc=new FakeDoc();let attempts=0;
+  const stop=initAmbientAudio({doc,engineFactory:()=>({
+    setVolume(){},playEffect(){},async play(){attempts++;if(attempts===1)throw Error('NotAllowedError');},async pause(){},async dispose(){}
+  })});
+  doc.press('Enter');await flush();
+  assert.equal(doc.button.dataset.playing,'false');
+  assert.match(doc.status.textContent,/browser requires/i);
+  doc.clickControl({planet:'venus'});await flush();
+  assert.equal(doc.button.dataset.playing,'true');
+  stop();
+});
+test('browser autoplay permission can start soundtrack immediately',async()=>{
+  const doc=new FakeDoc(),engine=mockEngine();
+  doc.defaultView.navigator={getAutoplayPolicy:()=> 'allowed'};
+  const stop=initAmbientAudio({doc,engineFactory:()=>engine});
+  await flush();assert.ok(engine.calls.includes('play'));
   stop();
 });
