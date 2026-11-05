@@ -31,6 +31,8 @@ def main():
             page.wait_for_selector('#planet-picker .planet-chip')
             page.wait_for_function("document.querySelector('#solar-system').classList.contains('solar-fallback')",timeout=15000)
             assert not page.locator('.solar-aura').count()
+            assert page.evaluate("Math.abs(document.querySelector('#solar-canvas').getBoundingClientRect().width - innerWidth)<2"), 'canvas does not span viewport'
+            assert page.evaluate("document.querySelector('.solar-background').getBoundingClientRect().height>=document.querySelector('.hero').getBoundingClientRect().height-1"), 'solar background is cropped'
             page.locator('.planet-chip[data-body="saturn"]').click()
             assert page.locator('body').get_attribute('data-planet')=='saturn'
             assert page.locator('#solar-return').is_visible()
