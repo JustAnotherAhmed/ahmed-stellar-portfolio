@@ -1,7 +1,7 @@
 import {SOLAR_BODIES,ORBITAL_BODIES,BODY_BY_ID,INITIAL_BODY,positionsAt} from './planets.mjs';
 import {CAMERA_OVERVIEW,FOCUS_DURATION_MS,focusZoomFor,sampleCamera,transitionCamera} from './camera-focus.mjs';
 import {createSurfaceTexture,createAtmosphere,addRings,addEarthClouds,loadPlanetPhoto,loadCloudImage,loadNightLights,addEarthNightLights,releaseAtlasTexture} from './planet-textures.mjs';
-import {sceneAnchoring,satelliteSafeZoom,anchoredCameraOffset,balancedPixelRatio} from './render-quality.mjs';
+import {sceneAnchoring,satelliteSafeZoom,anchoredCameraOffset,cinematicPixelRatio} from './render-quality.mjs';
 import {MARKER_INTERVAL_MS,dueForUpdate} from './performance.mjs';
 import {createTextureQueue} from './texture-queue.mjs';
 
@@ -28,7 +28,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   let cameraState={...CAMERA_OVERVIEW},cameraParallax={x:0,y:0},desiredParallax={x:0,y:0};
   const meshes=new Map(),markerMap=new Map(),pickerMap=new Map();
   let disposed=false,renderQuality=1,markerScale=1,lastMarkersAt=0,frameInterval=1000/60;
-  let textureQueue=null,qualityTimer=null,qualityPromoted=false;
+  let textureQueue=null;
   const positions=()=>positionsAt(elapsed);
   markerScale=Math.max(.01,stage.getBoundingClientRect().width/440);
   function closeupZoom(body){
@@ -264,8 +264,8 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         const w=Math.max(1,Math.round(canvasRect.width)),h=Math.max(1,Math.round(canvasRect.height));
         camera.left=-w/2;camera.right=w/2;camera.top=h/2;camera.bottom=-h/2;
         camera.updateProjectionMatrix();
-        const desiredRatio=balancedPixelRatio(w,h,window.devicePixelRatio||1,gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
-        renderQuality=qualityPromoted?desiredRatio:Math.min(1.25,desiredRatio);
+        // Full v9 ultra-HD pixel density from the first frame, bounded only by hardware.
+        renderQuality=cinematicPixelRatio(w,h,window.devicePixelRatio||1,gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
         renderer.setPixelRatio(renderQuality);
         renderer.setSize(w,h,false);
         positionDom(elapsed);
@@ -303,7 +303,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         if(disposed||!webglReady)return;
         const work=()=>{
           if(disposed||!webglReady)return;
-          try{applyMap(id,createSurfaceTexture(THREE,id,{width:1024}));}
+          try{applyMap(id,createSurfaceTexture(THREE,id,{width:4096}));}
           catch(error){console.warn('Retaining color-only planet material:',id,error);}
         };
         if(window.requestIdleCallback)window.requestIdleCallback(work,{timeout:1500});
@@ -344,7 +344,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
           if(id==='clouds'){
             const cloudFallback=()=>{
               if(disposed||!webglReady)return;
-              try{addEarthClouds(THREE,earth,{width:1024});}
+              try{addEarthClouds(THREE,earth,{width:4096});}
               catch(e){console.warn('Procedural clouds unavailable:',e);}
             };
             if(window.requestIdleCallback)window.requestIdleCallback(cloudFallback,{timeout:1800});
@@ -358,11 +358,6 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       renderOnce();start();
       // Begin heavy texture work after the first interactive 3D frame.
       textureQueue.start();
-      qualityTimer=window.setTimeout(()=>{
-        if(disposed||!webglReady)return;
-        qualityPromoted=true;
-        syncLayout();
-      },1400);
       canvas.addEventListener('webglcontextlost',event=>{
         event.preventDefault();webglReady=false;stop();root.classList.remove('has-three');
         root.classList.add('solar-fallback');hero?.classList.remove('has-three-background');
@@ -377,7 +372,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   if(!reduced.matches)initializeThree();else {root.classList.add('solar-fallback');renderOnce();}
   start();
   return ()=>{
-    disposed=true;stop();textureQueue?.stop();if(qualityTimer!==null)clearTimeout(qualityTimer);
+    disposed=true;stop();textureQueue?.stop();
     observer?.disconnect();resizeObserver?.disconnect();root._cleanupSolarLayout?.();
     hero?.classList.remove('has-three-background');
     document.removeEventListener('visibilitychange',onVisibility);
