@@ -17,12 +17,12 @@ test('render gates handle first tick, jitter, and invalid time',()=>{
   assert.ok(!dueForUpdate(NaN,110,1000/60));
   assert.equal(MARKER_INTERVAL_MS,1000/24);
 });
-test('marker updates stay efficient while ALL 4K atlases launch on startup',()=>{
+test('marker updates stay efficient while 4K images load progressively',()=>{
   const solar=source('solar-system.mjs');
   assert.match(solar,/dueForUpdate\(nowMs,lastMarkersAt,MARKER_INTERVAL_MS\)/);
   assert.match(solar,/const factor=markerScale/);
   assert.doesNotMatch(solar,/function positionDom\(t\) \{\s*const locations=positionsAt\(t\);\s*const factor=stage\.getBoundingClientRect/);
-  assert.match(solar,/for\(const body of SOLAR_BODIES\)\{\s*try\{loadPlanetPhoto/);
+  assert.match(solar,/textureQueue=createTextureQueue\(queueIds/);
   assert.doesNotMatch(solar,/requestIdleCallback\(nextTexture/);
   assert.match(solar,/const texture=null/);
   assert.match(solar,/anchoredCameraOffset\(world\.position,cameraState,worldScale,cameraState\.zoom/);

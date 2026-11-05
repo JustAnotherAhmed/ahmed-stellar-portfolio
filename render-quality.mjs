@@ -42,3 +42,10 @@ export function cinematicPixelRatio(width,height,deviceRatio=1,maxRenderbuffer=1
   const ratio=Math.max(2.5,Math.min(4,deviceRatio*1.5));
   return Math.max(.5,Math.min(ratio,maxRenderbuffer/width,maxRenderbuffer/height));
 }
+
+/** Preserve 4K map detail while bounding the GPU framebuffer pixel count. */
+export function balancedPixelRatio(width,height,deviceRatio=1,maxRenderbuffer=16384,budget=14_000_000){
+  const desired=cinematicPixelRatio(width,height,deviceRatio,maxRenderbuffer);
+  if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0||budget<=0)return 1;
+  return Math.max(.75,Math.min(desired,Math.sqrt(budget/(width*height))));
+}

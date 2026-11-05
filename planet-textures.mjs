@@ -131,7 +131,7 @@ export function addRings(THREE,mesh,id){
   return rings;
 }
 /** Translucent 4K cloud layer above the Earth. */
-export function addEarthClouds(THREE,earth,{texture=null,width=4096}={}){
+export function addEarthClouds(THREE,earth,{texture=null,width=4096,alphaMap=false}={}){
   if(!texture && typeof document==='undefined')return null;
   if(!texture){
     const canvas=document.createElement('canvas');canvas.width=width;canvas.height=width/2;
@@ -155,7 +155,7 @@ export function addEarthClouds(THREE,earth,{texture=null,width=4096}={}){
     texture.colorSpace=THREE.SRGBColorSpace;
     texture.anisotropy=16;
   }
-  const material=new THREE.MeshStandardMaterial({map:texture,transparent:true,
+  const material=new THREE.MeshStandardMaterial({map:alphaMap?null:texture,alphaMap:alphaMap?texture:null,color:'#f8fbff',transparent:true,
     depthWrite:false,opacity:.85,roughness:1,metalness:0});
   const cloudSphere=new THREE.Mesh(new THREE.SphereGeometry(1.018,160,112),material);
   cloudSphere.name='Earth cloud layer';earth.add(cloudSphere);
@@ -207,17 +207,44 @@ export function prepare4kTexture(THREE,image,{width=ATLAS_WIDTH}={}){
   texture.magFilter=THREE.LinearFilter;
   return texture;
 }
+/** Resize large downloaded atlases outside the main thread when supported. */
+export async function prepare4kTextureAsync(THREE,image,{width=ATLAS_WIDTH}={}){
+  if(typeof createImageBitmap==='function'){
+    try{
+      const bitmap=await createImageBitmap(image,{resizeWidth:width,resizeHeight:width/2,resizeQuality:'high'});
+      const texture=new THREE.Texture(bitmap);
+      texture.colorSpace=THREE.SRGBColorSpace;
+      texture.anisotropy=16;
+      texture.generateMipmaps=true;
+      texture.minFilter=THREE.LinearMipmapLinearFilter;
+      texture.magFilter=THREE.LinearFilter;
+      texture.needsUpdate=true;
+      texture.userData={...texture.userData,ownedBitmap:bitmap};
+      return texture;
+    }catch(error){console.warn('Asynchronous texture decode unavailable; using idle canvas conversion:',error);}
+  }
+  await new Promise(resolve=>{
+    if(typeof requestIdleCallback==='function')requestIdleCallback(resolve,{timeout:1800});
+    else setTimeout(resolve,30);
+  });
+  return prepare4kTexture(THREE,image,{width});
+}
+/** Release ImageBitmap memory as well as the GPU texture. */
+export function releaseAtlasTexture(texture){
+  texture?.dispose?.();
+  texture?.userData?.ownedBitmap?.close?.();
+}
 export function loadPlanetPhoto(THREE,id,onLoad,onError=()=>{}){
   const file=PHOTO_TEXTURE_PATHS[id];if(!file){onError(new Error('No atlas for '+id));return;}
   const loader=new THREE.ImageLoader();loader.setCrossOrigin('anonymous');
   loader.load(atlasUrl(file),image=>{
-    try{onLoad(prepare4kTexture(THREE,image));}catch(e){onError(e);}
+    void prepare4kTextureAsync(THREE,image).then(onLoad).catch(onError);
   },undefined,onError);
 }
 export function loadCloudImage(THREE,onLoad,onError=()=>{}){
   const loader=new THREE.ImageLoader();loader.setCrossOrigin('anonymous');
   loader.load(atlasUrl(EARTH_DETAIL_PATHS.clouds),image=>{
-    try{const texture=cloudAlphaTexture(THREE,image);if(!texture)throw Error('Cloud texture unavailable');onLoad(texture);}catch(e){onError(e);}
+    void prepare4kTextureAsync(THREE,image).then(onLoad).catch(onError);
   },undefined,onError);
 }
 export function addEarthNightLights(THREE,earth,texture){
@@ -242,6 +269,6 @@ export function addEarthNightLights(THREE,earth,texture){
 export function loadNightLights(THREE,onLoad,onError=()=>{}){
   const loader=new THREE.ImageLoader();loader.setCrossOrigin('anonymous');
   loader.load(atlasUrl(EARTH_DETAIL_PATHS.night),image=>{
-    try{onLoad(prepare4kTexture(THREE,image));}catch(e){onError(e);}
+    void prepare4kTextureAsync(THREE,image).then(onLoad).catch(onError);
   },undefined,onError);
 }
