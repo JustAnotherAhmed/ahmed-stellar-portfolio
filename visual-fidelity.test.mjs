@@ -19,8 +19,8 @@ test('successful maps and fallback maps both keep 4K target',()=>{
   assert.equal(Object.keys(PHOTO_TEXTURE_PATHS).length,10);
   assert.match(solar,/createSurfaceTexture\(THREE,id,\{width:4096\}\)/);
   assert.match(solar,/addEarthClouds\(THREE,earth,\{width:4096\}\)/);
-  assert.match(solar,/loadCloudImage\(THREE,ok,reject\)/);
-  assert.match(solar,/loadNightLights\(THREE,ok,reject\)/);
+  assert.match(solar,/loadCloudImage\(THREE,ok,fail\)/);
+  assert.match(solar,/loadNightLights\(THREE,ok,fail\)/);
   assert.match(EARTH_DETAIL_PATHS.clouds,/8k_/);
 });
 test('visual detail and progressive loading are retained after full-resolution restoration',()=>{

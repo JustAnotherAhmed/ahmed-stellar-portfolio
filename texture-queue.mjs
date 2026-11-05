@@ -1,22 +1,33 @@
 /** Progressive quality: prevent multiple 4K decode/upload jobs competing at startup. */
 export const ATLAS_CONCURRENCY = 2;
-export function createTextureQueue(ids,{load,failed=()=>{},maxConcurrent=ATLAS_CONCURRENCY,delayMs=150,
-  schedule=setTimeout,cancel=clearTimeout}={}){
+export function createTextureQueue(ids,{load,failed=()=>{},onSettled=()=>{},onComplete=()=>{},
+  maxConcurrent=ATLAS_CONCURRENCY,delayMs=150,schedule=setTimeout,cancel=clearTimeout}={}){
   if(typeof load!=='function'||!Number.isInteger(maxConcurrent)||maxConcurrent<1)
     throw new TypeError('A loader and positive concurrency limit are required');
   let pending=[...new Set(ids)],active=new Set(),complete=new Set();
-  let stopped=false,timer=null;
+  let stopped=false,timer=null,finished=false;
+  const total=pending.length;
   const pump=()=>{
     if(stopped)return;
     while(active.size<maxConcurrent&&pending.length){
       const id=pending.shift();
       if(complete.has(id)||active.has(id))continue;
       active.add(id);
-      Promise.resolve().then(()=>load(id)).catch(error=>{if(!stopped)failed(id,error);})
-        .finally(()=>{
-          active.delete(id);complete.add(id);
-          if(!stopped&&pending.length)next();
-        });
+      Promise.resolve().then(()=>load(id)).then(()=>true,async error=>{
+        if(!stopped)try{await failed(id,error);}
+        catch(fallbackError){console.warn('Texture fallback failed:',id,fallbackError);}
+        return false;
+      }).then(success=>{
+        active.delete(id);complete.add(id);
+        if(stopped)return;
+        try{onSettled({id,success,completed:complete.size,total});}
+        catch(error){console.warn('Texture progress unavailable:',error);}
+        if(complete.size===total && !finished){
+          finished=true;
+          try{onComplete({completed:complete.size,total});}
+          catch(error){console.warn('Texture completion handler failed:',error);}
+        }else if(pending.length)next();
+      });
     }
   };
   const next=()=>{
