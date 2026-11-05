@@ -5,6 +5,7 @@ import {sceneAnchoring,satelliteSafeZoom,anchoredCameraOffset,cinematicPixelRati
 import {MARKER_INTERVAL_MS,dueForUpdate} from './performance.mjs';
 import {createTextureQueue} from './texture-queue.mjs';
 import {createLaunchGate} from './launch-gate.mjs';
+import {attachPlanetRotation,rotatePlanet} from './planet-rotation.mjs';
 
 /**
  * Hybrid orrery. Transparent Three.js stage and accessible SVG/DOM markers share a 440-unit
@@ -15,6 +16,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   if(!root)return ()=>{};
   const $=s=>root.querySelector(s),canvas=document.getElementById('solar-canvas'),svg=$('#solar-orbits'),stage=$('.solar-stage');
   const markers=$('#solar-markers'),picker=document.getElementById('planet-picker');
+  const rotationPad=$('#planet-rotation-pad'),rotationHint=$('#planet-rotation-hint');
   const status=$('#solar-status'),facts=$('#planet-fact'),kind=$('#planet-kind');
   const title=$('#planet-name'),display=$('#planet-display'),returnButton=$('#solar-return');
   const fallback=$('#solar-closeup'),fallbackName=$('#solar-closeup-name');
@@ -31,7 +33,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   let cameraState={...CAMERA_OVERVIEW},cameraParallax={x:0,y:0},desiredParallax={x:0,y:0};
   const meshes=new Map(),markerMap=new Map(),pickerMap=new Map();
   let disposed=false,renderQuality=1,markerScale=1,lastMarkersAt=0,frameInterval=1000/60;
-  let textureQueue=null;
+  let textureQueue=null,draggingPlanet=false;
   const positions=()=>positionsAt(elapsed);
   markerScale=Math.max(.01,stage.getBoundingClientRect().width/440);
   function closeupZoom(body){
@@ -76,7 +78,9 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     if(body){
       fallback.dataset.body=body.id;fallback.style.setProperty('--focus-color',body.color);
       fallbackName.textContent=body.name;
-    }
+      rotationPad?.setAttribute('aria-label','Rotate '+body.name+' by dragging or using arrow keys.');
+      if(rotationHint)rotationHint.textContent='Drag or swipe to rotate '+body.name+' · Arrow keys also work';
+    }else{draggingPlanet=false;positionDom(elapsed);}
     const p=nextId?positions()[nextId]:{x:0,y:0};
     const to=nextId?{x:p.x,y:p.y,zoom:closeupZoom(body)}:CAMERA_OVERVIEW;
     transition=transitionCamera(cameraState,to,performance.now(),reduced.matches?1:FOCUS_DURATION_MS);
@@ -99,6 +103,14 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     status.textContent=`${body.name} selected. ${focus?'Camera focusing on this world.':'Choose a planet to explore.'}`;
     if(focus)startCameraTransition(id);
   }
+  const detachRotation=attachPlanetRotation(rotationPad,{
+    canRotate:()=>Boolean(focusedId)&&webglReady&&!disposed,
+    rotate:(dx,dy)=>{
+      const mesh=meshes.get(focusedId);
+      if(rotatePlanet(mesh,dx,dy)&&!raf)renderOnce();
+    },
+    onDragChange:dragging=>{draggingPlanet=dragging;}
+  });
   returnButton.addEventListener('click',()=>{
     startCameraTransition(null);
     status.textContent='Returned to the full solar system view.';
@@ -130,8 +142,9 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   function updateMeshes(dt){
     const locations=positions();
     for(const [id,mesh] of meshes){
+      if(!mesh.visible)continue;
       const p=locations[id];mesh.position.set(p.x,p.y,p.z);
-      if(dt)mesh.rotation.y+=dt*(id==='sun'?.035:.065);
+      if(dt&&!(draggingPlanet&&id===focusedId))mesh.rotation.y+=dt*(id==='sun'?.035:.065);
     }
     return locations;
   }
@@ -158,12 +171,12 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     const offset=anchoredCameraOffset(world.position,cameraState,worldScale,cameraState.zoom,{x:px,y:py});
     camera.position.set(offset.x,offset.y,700);
     camera.lookAt(offset.x,offset.y,0);
-    camera.zoom=cameraState.zoom;camera.updateProjectionMatrix();
+    if(camera.zoom!==cameraState.zoom){camera.zoom=cameraState.zoom;camera.updateProjectionMatrix();}
   }
   function paint(nowMs,dt){
     // Accessible planet markers need fewer DOM updates than WebGL render passes.
     // Avoid forcing a layout read and 20+ style writes every frame.
-    if(dueForUpdate(nowMs,lastMarkersAt,MARKER_INTERVAL_MS) || dt===0){
+    if(!focusedId&&(dueForUpdate(nowMs,lastMarkersAt,MARKER_INTERVAL_MS)||dt===0)){
       positionDom(elapsed);
       lastMarkersAt=nowMs;
     }
@@ -409,7 +422,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   if(!reduced.matches)initializeThree();else {launchGate.close();root.classList.add('solar-fallback');renderOnce();}
   start();
   return ()=>{
-    disposed=true;launchGate.dispose();stop();textureQueue?.stop();
+    disposed=true;detachRotation();launchGate.dispose();stop();textureQueue?.stop();
     observer?.disconnect();resizeObserver?.disconnect();root._cleanupSolarLayout?.();
     hero?.classList.remove('has-three-background');
     document.removeEventListener('visibilitychange',onVisibility);

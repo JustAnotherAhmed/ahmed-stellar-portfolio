@@ -648,3 +648,15 @@ body.stellar-preparing{overflow:hidden;}
 .stellar-loader__skip:focus-visible{outline:3px solid white;outline-offset:3px;}
 @keyframes stellar-pulse{0%,100%{opacity:.6;transform:scale(.95)}50%{opacity:1;transform:scale(1.08)}}
 @media(prefers-reduced-motion:reduce){.stellar-loader__symbol{animation:none;}}
+
+/* Focused planet: touch/mouse drag and keyboard arrow rotation. */
+.planet-rotation-pad{display:none;position:absolute;inset:0;z-index:12;border-radius:50%;
+  touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;outline:none;}
+.orbit-scene.has-three.is-focused .planet-rotation-pad{display:block;}
+.planet-rotation-pad[data-dragging="true"]{cursor:grabbing;}
+.planet-rotation-pad:focus-visible{outline:2px solid #a0eaf2;outline-offset:3px;}
+.planet-rotation-hint{display:none;position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  z-index:13;pointer-events:none;text-align:center;white-space:nowrap;max-width:92%;
+  border:1px solid rgba(160,220,242,.3);border-radius:999px;padding:7px 10px;
+  background:rgba(8,20,39,.84);color:#d5ecfa;font-size:10px;font-weight:650;}
+.orbit-scene.has-three.is-focused .planet-rotation-hint{display:block;}
