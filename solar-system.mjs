@@ -1,7 +1,7 @@
 import {SOLAR_BODIES,ORBITAL_BODIES,BODY_BY_ID,INITIAL_BODY,positionsAt} from './planets.mjs';
 import {CAMERA_OVERVIEW,FOCUS_DURATION_MS,focusZoomFor,sampleCamera,transitionCamera} from './camera-focus.mjs';
 import {createSurfaceTexture,createAtmosphere,addRings,addEarthClouds,loadPlanetPhoto} from './planet-textures.mjs';
-import {effectivePixelRatio,sceneAnchoring,satelliteSafeZoom} from './render-quality.mjs';
+import {effectivePixelRatio,sceneAnchoring,satelliteSafeZoom,anchoredCameraOffset} from './render-quality.mjs';
 
 /**
  * Hybrid orrery. Transparent Three.js stage and accessible SVG/DOM markers share a 440-unit
@@ -173,10 +173,12 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     cameraParallax.y+=(desiredParallax.y-cameraParallax.y)*k;
     const px=focusedId?cameraParallax.x*.10:cameraParallax.x;
     const py=focusedId?cameraParallax.y*.10:cameraParallax.y;
-    const offsetX=cameraState.x*worldScale+px;
-    const offsetY=cameraState.y*worldScale+py;
-    camera.position.set(offsetX,offsetY,700);
-    camera.lookAt(offsetX,offsetY,0);
+    // The orbital world is anchored to the right-hand stage within the full
+    // hero canvas. Camera zoom must compensate for that stage translation.
+    // Otherwise zoom magnifies the world offset and moves planets offscreen.
+    const offset=anchoredCameraOffset(world.position,cameraState,worldScale,cameraState.zoom,{x:px,y:py});
+    camera.position.set(offset.x,offset.y,700);
+    camera.lookAt(offset.x,offset.y,0);
     camera.zoom=cameraState.zoom;camera.updateProjectionMatrix();
   }
   function paint(nowMs,dt){

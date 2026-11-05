@@ -11,6 +11,22 @@ export function sceneAnchoring(backdrop,stage){
     x:stage.left+stage.width/2-(backdrop.left+backdrop.width/2),
     y:(backdrop.top+backdrop.height/2)-(stage.top+stage.height/2)};
 }
+/**
+ * Compute the camera offset so a local world point stays at the
+ * scene's right-hand overlay anchor under orthographic zoom.
+ *
+ * projectedX = zoom * (anchor.x + local.x * scale - camera.x)
+ * At centered focus projectedX must equal anchor.x for any zoom.
+ */
+export function anchoredCameraOffset(anchor,local,scale,zoom,parallax={x:0,y:0}){
+  if(!Number.isFinite(zoom)||zoom<=0||!Number.isFinite(scale)||scale<=0)
+    throw new RangeError('Invalid camera scale or zoom');
+  const hold=1-1/zoom;
+  return {
+    x:local.x*scale+anchor.x*hold+(parallax.x||0),
+    y:local.y*scale+anchor.y*hold+(parallax.y||0)
+  };
+}
 /** Keep Earth's orbiting Moon fully on-screen at any width. */
 export function satelliteSafeZoom(requested,viewport,anchorX,scale,reach=17,margin=20){
   if(!Number.isFinite(requested)||requested<=0||!Number.isFinite(scale)||scale<=0)return 1;
