@@ -5,7 +5,7 @@
   <meta content="width=device-width, initial-scale=1" name="viewport"/>
   <meta content="dark" name="color-scheme"/>
   <meta content="#070c1d" name="theme-color"/>
-  <meta content="interactive-refresh-2026-11-05" name="portfolio-release"/>
+  <meta content="solar-planet-explorer-and-knowledge-arcade-v3" name="portfolio-release"/>
   <title>
    Ahmed Osama | AI Automation &amp; IT Systems
   </title>
@@ -20,7 +20,7 @@
   <script src="/app.mjs" type="module">
   </script>
  </head>
- <body>
+ <body data-planet="earth">
   <a class="skip-link" href="#main">
    Skip to content
   </a>
@@ -144,59 +144,22 @@
       UAE Golden Visa holder
      </p>
     </div>
-    <div aria-hidden="true" class="orbit-scene">
-     <div class="space-grid">
+    <div class="orbit-scene" id="solar-system" aria-label="Interactive solar system explorer">
+     <div class="solar-stage">
+      <div class="solar-aura" aria-hidden="true"></div>
+      <canvas id="solar-canvas" width="440" height="440" aria-hidden="true"></canvas>
+      <svg id="solar-orbits" aria-hidden="true" class="solar-orbits" viewBox="0 0 440 440"></svg>
+      <div class="solar-markers" id="solar-markers" role="group" aria-label="Select a celestial body on the orbit diagram"></div>
+      <span class="solar-scene-tag" aria-hidden="true">SOLAR SYSTEM // LIVE</span>
+      <span class="solar-scene-caption" aria-hidden="true">ORBITAL PERIODS · VISUALIZED</span>
      </div>
-     <div class="orbit orbit--outer">
+     <div class="solar-info-card" role="region" aria-label="Selected celestial body details">
+      <div class="solar-info-head"><span id="planet-kind">TERRESTRIAL PLANET</span><span aria-hidden="true" class="solar-info-pulse">● LIVE</span></div>
+      <h2 id="planet-name">Earth</h2>
+      <p id="planet-display">Our home planet.</p>
+      <div class="solar-fact"><b>✧ DID YOU KNOW?</b><p id="planet-fact">Earth is the only world where life has been confirmed so far.</p></div>
      </div>
-     <div class="orbit orbit--mid">
-     </div>
-     <div class="orbit orbit--inner">
-     </div>
-     <div class="planet-glow">
-     </div>
-     <div class="planet">
-      <div class="planet__atmosphere">
-      </div>
-      <div class="planet__land planet__land--one">
-      </div>
-      <div class="planet__land planet__land--two">
-      </div>
-     </div>
-     <div class="orbit-dot orbit-dot--one">
-     </div>
-     <div class="orbit-dot orbit-dot--two">
-     </div>
-     <div class="orbit-dot orbit-dot--three">
-     </div>
-     <div class="scene-label scene-label--top">
-      <span class="scene-label__signal">
-      </span>
-      <span>
-       ORBITAL SYSTEM
-       <br/>
-       <b>
-        ALL SYSTEMS ONLINE
-       </b>
-      </span>
-     </div>
-     <div class="scene-label scene-label--bottom">
-      <span>
-       AO // 2026
-      </span>
-      <b>
-       BUILDING THE NEXT THING
-      </b>
-      <span class="scene-bars">
-       ▂ ▅ ▇ &lhblk; ▆
-      </span>
-     </div>
-     <span class="scene-tick scene-tick--a">
-      +
-     </span>
-     <span class="scene-tick scene-tick--b">
-      +
-     </span>
+     <p class="solar-a11y-status visually-hidden" id="solar-status" aria-live="polite"></p>
     </div>
     <div class="hero-scroll">
      <span class="monotext">
@@ -207,6 +170,12 @@
      </span>
     </div>
    </section>
+   <div class="planet-picker-bar" role="region" aria-label="Solar system theme explorer">
+    <div class="container planet-picker-wrap">
+     <span class="planet-picker-caption">EXPLORE A WORLD <span aria-hidden="true">↗</span></span>
+     <div class="planet-picker" id="planet-picker" role="group" aria-label="Choose a celestial body to change the website theme"></div>
+    </div>
+   </div>
    <section class="metrics-wrap">
     <div aria-label="Professional highlights" class="metrics container">
      <div class="metric">
@@ -1055,38 +1024,34 @@
     </div>
    </section>
    <section aria-labelledby="signal-title" class="section container section-game" id="signal">
-    <div class="game-shell">
+    <div class="game-shell quiz-shell" id="general-quiz">
      <div class="game-copy">
-      <p class="section-kicker">BONUS / OPTIONAL SIDE QUEST</p>
-      <h2 id="signal-title">The AI <em>knowledge gauntlet.</em></h2>
-      <p>How well do you know artificial intelligence? Eight multiple-choice questions, four escalating levels: Easy, Intermediate, Hard and Extreme. No typing, no timer, no locked résumé content.</p>
-      <div class="quiz-level-list" aria-label="Quiz difficulty levels"><span>01 Easy</span><span>02 Intermediate</span><span>03 Hard</span><span>04 Extreme</span></div>
-      <div aria-live="polite" class="game-prize" id="achievement-indicator"><span aria-hidden="true">✦</span><span>AI Explorer achievement <b>not yet unlocked</b></span></div>
+      <p class="section-kicker">BONUS / THE KNOWLEDGE ARCADE</p>
+      <h2 id="signal-title">Know a little about <em>everything?</em></h2>
+      <p>Pick your difficulty and take on a randomized, multiple-choice general-knowledge quiz. New questions each run, instant explanations, no timer and no repeats within a session.</p>
+      <div class="quiz-topic-tags"><span>SCIENCE</span><span>ART</span><span>HISTORY</span><span>TECH</span><span>GEOGRAPHY</span><span>MORE ↗</span></div>
+      <p class="quiz-optional">A side quest only. Your résumé, work and contact details never require completing a game.</p>
      </div>
-     <div class="game-console" id="signal-game">
-      <div class="game-console__header"><span><i aria-hidden="true"></i> AI KNOWLEDGE / v2.0</span><span>◉ ◉ ◉ ◉</span></div>
-      <div class="game-idle" id="game-idle">
-       <div aria-hidden="true" class="signal-emblem">✧</div>
-       <p>Ready to test your AI knowledge?</p>
-       <button class="btn btn-primary game-start" id="game-start" type="button">Start AI quiz <span aria-hidden="true">&rarr;</span></button>
+     <div class="quiz-console">
+      <div class="game-console__header"><span><i aria-hidden="true"></i> KNOWLEDGE ARCADE / v3</span><span>● ● ●</span></div>
+      <div class="quiz-choose" id="quiz-choose">
+       <p class="quiz-console-label">SELECT A DIFFICULTY</p>
+       <div class="quiz-difficulties" id="quiz-difficulty" role="group" aria-label="Quiz difficulty"></div>
+       <p>10 random questions per run. Choose another run to keep playing.</p>
       </div>
-      <div class="game-active" hidden id="game-active">
-       <div class="game-progress" id="game-progress">EASY · QUESTION 1 / 8</div>
-       <div class="quiz-level-track" id="quiz-level-track" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-       <h3 id="game-question" tabindex="-1"></h3>
-       <div aria-label="Choose one answer" class="game-options" id="game-options" role="group"></div>
-       <p aria-live="polite" class="game-feedback" id="game-feedback" role="status"></p>
-       <div class="game-controls">
-        <button class="btn btn-secondary game-next" hidden id="game-next" type="button">Next question &rarr;</button>
-        <button class="game-exit" id="game-exit" type="button">Exit quiz</button>
-       </div>
+      <div class="quiz-active" id="quiz-active" hidden>
+       <div class="quiz-progress-row"><span id="quiz-progress"></span><strong id="quiz-score">SCORE 0</strong></div>
+       <h3 tabindex="-1" id="quiz-question"></h3>
+       <div class="quiz-options" id="quiz-options" role="group" aria-label="Multiple choice answers"></div>
+       <p class="quiz-feedback" id="quiz-feedback" role="status" aria-live="polite"></p>
+       <div class="game-controls"><button class="btn btn-primary" id="quiz-next" type="button" hidden>Next question →</button><button class="game-exit" id="quiz-stop" type="button">Stop playing</button></div>
       </div>
-      <div class="game-complete" hidden id="game-complete">
-       <span aria-hidden="true" class="complete-icon">✦</span>
-       <h3>Mission complete.</h3>
-       <p id="game-result" aria-live="polite">Your score is ready.</p>
-       <button class="btn btn-secondary" id="game-restart" type="button">Try again &orarr;</button>
+      <div class="quiz-complete" id="quiz-complete" hidden>
+       <span class="complete-icon" aria-hidden="true">✦</span><h3>All questions explored.</h3>
+       <p id="quiz-final-score" aria-live="polite"></p>
+       <div class="quiz-finish-buttons"><button class="btn btn-primary" id="quiz-play-again" type="button">Play another round ↗</button><button class="btn btn-secondary" id="quiz-change-difficulty" type="button">Change difficulty</button></div>
       </div>
+      <p id="quiz-status" role="status" aria-live="polite" class="quiz-status"></p>
      </div>
     </div>
    </section>
@@ -1188,7 +1153,7 @@
   </dialog>
   <noscript>
    <div class="noscript-notice">
-    The full r&eacute;sum&eacute; and work history remain available. Enable JavaScript for filters, quick navigation, the design lab, and the optional AI quiz.
+    The full r&eacute;sum&eacute; and work history remain available. Enable JavaScript for the optional solar explorer, design lab and general knowledge quiz.
    </div>
   </noscript>
  </body>

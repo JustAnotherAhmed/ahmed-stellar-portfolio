@@ -1,83 +1,99 @@
-# Ahmed Osama — Stellar Portfolio (GitHub-ready, no build required)
+# Ahmed Osama · Stellar Portfolio v3
 
-This archive is the complete website. **All files are at the top level of this ZIP.**
-It is a self-contained, accessible, SEO-friendly HTML/CSS/JavaScript site with no external dependencies, no backend, and no build step.
+A premium, accessible, single-page personal portfolio built with **semantic HTML, CSS, and vanilla JavaScript ES modules**. No React, Node dependencies or compilation is required. Existing résumé sections and the WhatsApp contact link are retained.
 
-## What is included
+## Quick start
 
-| File | Purpose |
+1. Extract this entire ZIP into one folder. **Keep the files in the project root** (especially `index.html`, `app.mjs`, `styles.css` and `vercel.json`).
+2. Use a local static server (ES modules cannot reliably load from `file://`):
+
+   ```bash
+   python -m http.server 8000
+   ```
+
+3. Open `http://localhost:8000` in a current browser.
+4. For the online WebGL Three.js scene, the browser must be able to reach `https://cdn.jsdelivr.net`. If it cannot, the accessible animated 2D orbit explorer remains fully usable.
+
+There are **no `npm install` or `npm run build` steps**. With modern browsers supporting CSS `color-mix`, WebGL2 and ES modules, the full experience is available. Older/restricted devices use the 2D fallback instead of crashing.
+
+## Deploy / update Vercel
+
+The project remains compatible with the existing GitHub→Vercel setup.
+
+- Framework: **Other**
+- Root directory: `./`
+- Build command: **empty**
+- Output directory: `.`
+- Environment variables: **none**
+
+Push all top-level files to the existing GitHub repository; Vercel's Git integration deploys commits on its production branch. You can also deploy the unzipped root directory through a static-hosting workflow. Do **not** upload a ZIP as though it were a single website file.
+
+## Architecture
+
+| File | Responsibility |
 | --- | --- |
-| `index.html` | The whole résumé content and portfolio HTML — **the homepage** |
-| `styles.css` | Responsive styling, cosmic layout, reduced-motion rules |
-| `app.mjs` | Navigation, filters, command palette, AI quiz, web design lab, copy email |
-| `game.mjs` | Tested AI quiz questions, difficulty levels and state machine |
-| `storage.mjs` | Safe achievement persistence |
-| `Ahmed-Osama-Resume.pdf` | The actual uploaded résumé used by the download button |
-| `favicon.svg` | Browser tab icon |
-| `og-image.png` | Social link preview image |
-| `robots.txt` | Search engine crawl guidance |
-| `vercel.json` | Vercel static deployment output and security headers |
-| `portfolio.test.mjs` | Automated tests for page files, paths, résumé, and interactions |
-| `README.md` | This documentation |
-| `START-HERE.md` | Complete beginner-friendly GitHub → Vercel instructions |
+| `index.html` | Recruiter-first résumé, projects, design laboratory, solar-explorer and quiz shells |
+| `styles.css` | Design system, planet-shifted colors, responsive layout, reduced-motion and interactive styles |
+| `app.mjs` | Existing navigation, filters, command palette, website-design lab and safe feature initializers |
+| `planets.mjs` | Solar body facts, scaled orbital model, theme tokens, and WCAG contrast calculation helpers |
+| `solar-system.mjs` | 2D SVG orbital paths, keyboard/mouse planet controls, Three.js WebGL2 scene, animation lifecycle, fallback |
+| `question-bank.mjs` | 45 curated multiple-choice questions (15 per difficulty) spanning science, history, geography, arts and computing |
+| `quiz.mjs` | Pure quiz state machine, Fisher–Yates shuffle, scores, correctness and no-repeat behavior |
+| `quiz-ui.mjs` | Accessible browser quiz UI with immediate feedback, continue, replay and stop controls |
+| `*.test.mjs` | Unit/structural regression tests (Node standard test runner) |
+| `smoke_browser.py` | Optional browser smoke checks, including WebGL-disabled fallback |
+| `vercel.json` | Static host configuration and security headers |
+| `Ahmed-Osama-Resume.pdf` | Source résumé used for download |
 
-## Most important: This site has NO build process
+### Solar scene design
 
-* **Do not use** old ZIP files with `package.json`, `scripts/build.mjs`, or `dist/`.
-* **Do not select** `npm run build` in Vercel. No `npm install` is needed.
-* Vercel: Framework **Other**, Root Directory **`./`**, Build Command **blank** (enable override only if Vercel auto-populates one), Output Directory **`.`** (project root).
-* **All files in this ZIP must be uploaded to the root of one GitHub repository.** Upload the extracted FILES, not the ZIP file.
+- **Hybrid rendering:** SVG ellipses remain visible as 2D orbital paths. A Three.js `WebGLRenderer` paints spherical bodies and sparse star points behind the transparent SVG/DOM controls.
+- Relative orbit periods and radius proportions are **illustrative, not astronomically to scale**. Mercury moves fastest, outer planets slowest, and the Moon travels around the moving Earth.
+- The camera includes subtle pointer parallax. Device pixel ratio is capped, point count is small, and the frame loop pauses when the tab is hidden or the orrery is offscreen.
+- Under `prefers-reduced-motion: reduce`, motion is not started. Failed WebGL initialization, missing CDN, or lost graphics context never hides the fact panel, theme buttons or résumé.
+- Each Sun/planet/Moon selection updates the body fact card and CSS theme variables. All theme palette foreground/background pairs are tested for at least **4.5:1** contrast.
 
-## Edit résumé, projects and contact
+### General knowledge quiz design
 
-Everything recruiters read is already in the static `index.html`, so it also works if JavaScript is disabled.
-Open `index.html` in the GitHub editor or your code editor and search for the text to change:
+- Player selects **Easy**, **Medium**, or **Hard**. Each level contains 15 distinct four-choice questions drawn from a separate data module.
+- Questions are Fisher–Yates shuffled at the start of each run; the opening questions are explicitly changed for consecutive runs of the same difficulty. Each question appears at most once **within one game session**.
+- An answer immediately locks and displays whether it was correct plus a brief explanation. The score increases only on a correct answer.
+- Players can answer 10 questions, stop at any time, replay a fresh subset, or switch difficulty. Replaying starts a new session; extending a bank is straightforward.
 
-* `Hey, I'm Ahmed Osama` — intro; `hero-title` — headline.
-* `id="work"` — project cards and case studies; update titles, descriptions, outcomes, tags.
-* `id="experience"` — work history.
-* `id="skills"` — technologies and capabilities.
-* `id="about"` — degree, certifications and languages.
-* `id="contact"` — email, phone, location.
-* Change `Ahmed-Osama-Resume.pdf` **only by replacing the PDF with one using the exact same filename**, or update the corresponding link in `index.html`.
-* You can add real GitHub, LinkedIn or project-demo URLs later. No unverified social/profile links were invented.
-* `og-image.png` can be replaced with a branded preview image of the same filename.
+## Tests
 
-**Only use accurate claims that you can substantiate.** Existing portfolio content comes from the attached résumé. Project case studies were written from the résumé bullets (no invented public URLs).
+Node 20+ is recommended (no packages to install):
 
-## Testing
-
-You can test with Node.js 20+ without installing packages:
-
-```sh
-node --test portfolio.test.mjs
+```bash
+node --test *.test.mjs
 ```
 
-Or preview locally using built-in Python (if installed):
+Checks cover body count and facts, orbit geometry, theme contrast ratios for every body, question bank validity and breadth, deterministic shuffle and no-repeat logic, feedback/score/stop, static assets, fallback/error-handling declarations, and Vercel configuration.
 
-```sh
-python -m http.server 8000
+Optional browser smoke tests:
+
+```bash
+python -m pip install playwright
+python -m playwright install chromium
+python smoke_browser.py
 ```
 
-Open http://localhost:8000/ . Do not double-click `index.html` to test the module script, because file:// module security rules may block JavaScript.
+The smoke test loads modules into an isolated browser page and intentionally exercises the WebGL-unavailable path. It clicks planets/themes, starts a quiz, answers questions, verifies the design lab and WhatsApp link, and checks mobile overflow. The bundled script assumes `/usr/bin/chromium` on Linux; modify `executable_path` to use your local browser on other platforms.
 
-The portfolio content loads without JavaScript; the menu, filters, quick navigation, copy-email interaction and AI quiz / web lab need JavaScript enabled.
+## Customize
 
-## SEO & accessibility
+- **Portfolio copy:** edit `index.html` directly. Search for `id="work"`, `id="experience"`, `id="skills"`, `id="about"`, and `id="contact"`. Resume-linked information is sourced from the user's uploaded PDF; do not replace measurements with invented ones.
+- **WhatsApp:** in `index.html`, search for `https://wa.me/971521133465` and edit the country-code number and prefilled message as necessary.
+- **Solar bodies/facts:** update `SOLAR_BODIES` in `planets.mjs`. Data includes accessible name, description, fact, colors, size and scaled orbit period. Facts are short paraphrases of NASA's Solar System Exploration resources.
+- **Theme colors:** adjust `accent` and `background` in `planets.mjs`; rerun the contrast tests. Every theme keeps light text over a dark background.
+- **Quiz topics:** add an entry to the appropriate array in `question-bank.mjs` as `[id, topic, question, [option1,option2,option3,option4], correctOption, explanation]`. Keep IDs unique, answer options distinct, and the correct answer included in the options.
+- **Resume:** replace `Ahmed-Osama-Resume.pdf` with a file using the same filename.
 
-* Semantic landmarks/headings, skip navigation, focus indicators, contrast-conscious styling and reduced-motion support.
-* No remote fonts, trackers or image dependencies.
-* Native browser `<dialog>` quick-jump UI.
-* The résumé is real, downloadable, and included in the GitHub repository.
-* Game logic, storage fallbacks, structure, link targets, and asset paths are tested.
+## External resources and factual sources
 
-## Support and maintenance
+- **Three.js** 0.187.0 (MIT license), pinned ESM CDN delivery: https://github.com/mrdoob/three.js . The library is **optional at runtime**; the portfolio and SVG/DOM orbital controls remain functional when the CDN cannot be reached. No other runtime scripts, trackers or web-font network requests are used.
+- Solar-system descriptions and facts verified against **NASA Science**: https://science.nasa.gov/solar-system/solar-system-facts/ and https://science.nasa.gov/planetary-science/focus-areas/ .
 
-See `START-HERE.md` for the exact, safe beginner deployment workflow. After GitHub is connected to Vercel, editing/committing files normally creates new deployments automatically.
+## Graceful degradation and accessibility
 
-## Interactive portfolio refresh — November 2026
-
-- **WhatsApp CTA:** `index.html` links to `https://wa.me/971521133465` with a prefilled introduction. This opens WhatsApp; the visitor must press Send. To change the number, edit the URL with country code and no spaces or leading `+`.
-- **AI general knowledge quiz:** Eight multiple-choice questions across Easy, Intermediate, Hard and Extreme. Edit the `QUESTIONS` array in `game.mjs` to update questions, four options, the correct answer and explanations. The quiz is entirely optional.
-- **Web design lab:** Accessible Orbit/Nova theme and Grid/Stack layout controls demonstrate frontend design interactivity. Its markup is in `index.html`, styling in `styles.css`, and behavior in `app.mjs`. It is explicitly marked as a demo, not a client project.
-- **Testing:** Run `node --test portfolio.test.mjs`. The website still needs no install or build command. Merging to `main` triggers the connected Vercel production deployment.
+The critical résumé is static HTML, so it remains readable if scripts fail. Planet selection uses real buttons with names and `aria-pressed`; the keyboard-accessible selector supports Arrow Left/Right, Home and End. Quiz answers use real buttons, with status announcements for feedback. Focus styles, skip navigation and reduced-motion preferences are respected throughout. No game gates access to contact details.

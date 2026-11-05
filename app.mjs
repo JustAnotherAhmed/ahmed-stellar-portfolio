@@ -1,5 +1,5 @@
-import { QUESTIONS, LEVELS, initialGame, updateGame } from './game.mjs';
-import { readAchievement, writeAchievement } from './storage.mjs';
+import { initSolarSystem } from './solar-system.mjs';
+import { initGeneralQuiz } from './quiz-ui.mjs';
 
 const $ = (selector, context = document) => context.querySelector(selector);
 const $$ = (selector, context = document) => [...context.querySelectorAll(selector)];
@@ -48,7 +48,8 @@ const commands = [
   { label: 'About & education', hint: '04 / PROFILE', target: '#about', icon: '⌁' },
   { label: 'Contact Ahmed', hint: '05 / SAY HELLO', target: '#contact', icon: '↗' },
   { label: 'Web design lab', hint: 'INTERACTIVE / LIVE PREVIEW', target: '#web-lab', icon: '◈' },
-  { label: 'AI knowledge quiz', hint: 'BONUS / SIDE QUEST', target: '#signal', icon: '✧' },
+  { label: 'Knowledge arcade', hint: 'BONUS / GENERAL QUIZ', target: '#signal', icon: '✧' },
+  { label: 'Solar system explorer', hint: 'EXPLORE / PLANETS', target: '#top', icon: '◉' },
 ];
 
 function initCommandPalette() {
@@ -138,87 +139,10 @@ function initCommandPalette() {
   });
 }
 
-function initSignalGame() {
-  const root = $('#signal-game');
-  if (!root) return;
-  const idle = $('#game-idle'), active = $('#game-active'), complete = $('#game-complete');
-  const question = $('#game-question'), options = $('#game-options'), progress = $('#game-progress');
-  const feedback = $('#game-feedback'), next = $('#game-next'), result = $('#game-result');
-  const achievement = $('#achievement-indicator'), track = $('#quiz-level-track');
-  let state = initialGame();
-  const storage = (() => { try { return window.localStorage; } catch { return null; } })();
-  const showAchievement = () => {
-    if (!achievement) return;
-    const label = achievement.querySelector('b');
-    if (label) label.textContent = 'unlocked ✓';
-    achievement.classList.add('is-unlocked');
-  };
-  if (readAchievement(storage)) showAchievement();
-  const render = () => {
-    idle.hidden = state.phase !== 'idle';
-    active.hidden = state.phase !== 'playing';
-    complete.hidden = state.phase !== 'complete';
-    if (state.phase === 'complete') {
-      result.textContent = `You scored ${state.score} out of ${QUESTIONS.length}. ${state.score === QUESTIONS.length ? 'Perfect run — AI Master!' : state.score >= 6 ? 'Brilliant work, Explorer!' : 'Nice exploration. Want another run?'}`;
-      writeAchievement(storage);
-      showAchievement();
-      return;
-    }
-    if (state.phase !== 'playing') return;
-    const current = QUESTIONS[state.round];
-    if (!current) throw new Error('Invalid quiz question');
-    progress.textContent = `${current.level.toUpperCase()} · QUESTION ${state.round + 1} / ${QUESTIONS.length} · SCORE ${state.score}`;
-    question.textContent = current.question;
-    feedback.textContent = state.feedback;
-    if (track) [...track.children].forEach((step, index) => {
-      step.classList.toggle('is-past', index < LEVELS.indexOf(current.level));
-      step.classList.toggle('is-current', index === LEVELS.indexOf(current.level));
-    });
-    options.replaceChildren();
-    for (const choice of current.options) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'signal-option';
-      b.textContent = choice;
-      b.disabled = state.answered;
-      if (state.answered && choice === current.correct) b.classList.add('is-correct');
-      if (state.answered && choice === state.selected && choice !== current.correct) b.classList.add('is-wrong');
-      b.addEventListener('click', () => dispatch({ type: 'ANSWER', answer: choice }));
-      options.append(b);
-    }
-    next.hidden = !state.answered;
-    next.textContent = state.round === QUESTIONS.length - 1 ? 'See my score →' : 'Next question →';
-    if (state.answered) next.focus();
-  };
-  const dispatch = (action) => {
-    try {
-      const previous = state;
-      state = updateGame(state, action);
-      render();
-      if (['START','RESTART','NEXT'].includes(action.type) && state.phase === 'playing') question.focus();
-      if (previous.phase === 'playing' && state.phase === 'complete') $('#game-restart')?.focus();
-      if (action.type === 'EXIT') $('#game-start')?.focus();
-    } catch (error) {
-      console.error('AI quiz unavailable:', error);
-      state = initialGame();
-      render();
-      const errorMessage = document.createElement('p');
-      errorMessage.className = 'game-error';
-      errorMessage.setAttribute('role','alert');
-      errorMessage.textContent = 'Quiz temporarily unavailable. You can still explore the full portfolio.';
-      root.querySelector('.game-error')?.remove();
-      root.append(errorMessage);
-    }
-  };
-  $('#game-start')?.addEventListener('click', () => dispatch({ type: 'START' }));
-  $('#game-next')?.addEventListener('click', () => dispatch({ type: 'NEXT' }));
-  $('#game-exit')?.addEventListener('click', () => dispatch({ type: 'EXIT' }));
-  $('#game-restart')?.addEventListener('click', () => dispatch({ type: 'RESTART' }));
-  render();
-}
-
 function initDesignLab() {
-  const root = $('#design-lab'), preview = $('#lab-preview'), status = $('#lab-status');
+  const root = $('#design-lab');
+  const preview = $('#lab-preview');
+  const status = $('#lab-status');
   if (!root || !preview || !status) return;
   const controls = $$('[data-lab-theme], [data-lab-layout]', root);
   for (const button of controls) button.addEventListener('click', () => {
@@ -258,7 +182,7 @@ function initCopyEmail() {
 /** Feature isolation: broken optional interactions must not hide résumé content. */
 for (const [name, setup] of [
   ['menu', initMenu], ['filters', initFilters], ['quick navigation', initCommandPalette],
-  ['AI knowledge quiz', initSignalGame], ['web design lab', initDesignLab], ['copy email', initCopyEmail],
+  ['solar system', initSolarSystem], ['knowledge arcade', initGeneralQuiz], ['web design lab', initDesignLab], ['copy email', initCopyEmail],
 ]) {
   try { setup(); } catch (error) { console.error(`Could not initialize ${name}:`, error); }
 }
