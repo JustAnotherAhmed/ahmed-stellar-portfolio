@@ -1,55 +1,89 @@
-import { SOLAR_BODIES, ORBITAL_BODIES, BODY_BY_ID, INITIAL_BODY, positionsAt } from './planets.mjs';
+import {SOLAR_BODIES,ORBITAL_BODIES,BODY_BY_ID,INITIAL_BODY,positionsAt} from './planets.mjs';
+import {CAMERA_OVERVIEW,FOCUS_DURATION_MS,focusZoomFor,sampleCamera,transitionCamera} from './camera-focus.mjs';
+import {createSurfaceTexture,createAtmosphere,addRings} from './planet-textures.mjs';
 
 /**
- * Hybrid scene: Three.js spheres and point stars + real DOM/SVG 2D orbital paths.
- * DOM controls and scientific descriptions work even if WebGL/CDN fails.
+ * Hybrid orrery. Transparent Three.js stage and accessible SVG/DOM markers share a 440-unit
+ * coordinate system. Selected bodies enter an eased camera closeup; the fact card never moves.
+ * If WebGL, a texture canvas, or the CDN fails, the CSS-rendered planet is still selectable.
  */
 export function initSolarSystem(root=document.getElementById('solar-system')) {
-  if (!root) return () => {};
-  const $=selector=>root.querySelector(selector);
-  const svg=$('#solar-orbits'), markers=$('#solar-markers'), picker=document.getElementById('planet-picker');
-  const canvas=$('#solar-canvas'), display=$('#planet-display');
-  const facts=$('#planet-fact'), kind=$('#planet-kind'), title=$('#planet-name');
-  const status=$('#solar-status');
+  if(!root)return ()=>{};
+  const $=s=>root.querySelector(s),canvas=$('#solar-canvas'),svg=$('#solar-orbits');
+  const markers=$('#solar-markers'),picker=document.getElementById('planet-picker');
+  const status=$('#solar-status'),facts=$('#planet-fact'),kind=$('#planet-kind');
+  const title=$('#planet-name'),display=$('#planet-display'),returnButton=$('#solar-return');
+  const fallback=$('#solar-closeup'),fallbackName=$('#solar-closeup-name');
+  if(!canvas||!svg||!markers||!picker||!returnButton)return ()=>{};
   const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
-  const sceneMotion={enabled:!reduced.matches,visible:!document.hidden,intersecting:true};
+  const motion={enabled:!reduced.matches,visible:!document.hidden,intersecting:true};
   const NS='http://www.w3.org/2000/svg';
-  let raf=0,renderer=null,scene=null,camera=null,meshes=new Map(),stars=null,active=INITIAL_BODY;
-  let elapsed=60,last=0,webglReady=false,cameraTarget={x:0,y:0},cameraNow={x:0,y:0};
-  const markerMap=new Map(),pickerMap=new Map(),worldScale=1;
+  let raf=0,last=0,elapsed=60,scene=null,camera=null,renderer=null,stars=null,webglReady=false;
+  let threeModule=null,transition=null,focusedId=null,active=INITIAL_BODY;
+  let cameraState={...CAMERA_OVERVIEW},cameraParallax={x:0,y:0},desiredParallax={x:0,y:0};
+  const meshes=new Map(),markerMap=new Map(),pickerMap=new Map();
+  let disposed=false;
+  const positions=()=>positionsAt(elapsed);
+
+  svg.setAttribute('viewBox','0 0 440 440');
   for(const body of ORBITAL_BODIES){
-    const track=document.createElementNS(NS,'ellipse');
-    track.setAttribute('cx','50%');track.setAttribute('cy','50%');
-    track.setAttribute('rx',String(body.radius));track.setAttribute('ry',String(body.radius*.76));
-    track.setAttribute('class','solar-track');track.dataset.orbit=body.id;
-    svg.append(track);
+    const track=document.createElementNS(NS,'ellipse');track.setAttribute('cx','220');track.setAttribute('cy','220');
+    track.setAttribute('rx',body.radius);track.setAttribute('ry',body.radius*.76);
+    track.classList.add('solar-track');track.dataset.orbit=body.id;svg.append(track);
   }
-  const moonTrack=document.createElementNS(NS,'circle');moonTrack.setAttribute('class','solar-track solar-track--moon');moonTrack.setAttribute('r','13');svg.append(moonTrack);
+  const moonTrack=document.createElementNS(NS,'circle');
+  moonTrack.setAttribute('class','solar-track solar-track--moon');moonTrack.setAttribute('r','13');svg.append(moonTrack);
   for(const body of SOLAR_BODIES){
     const button=document.createElement('button');button.type='button';button.className='solar-hit';
-    button.dataset.body=body.id;button.title=`Explore ${body.name}`;button.setAttribute('aria-label',`Explore ${body.name}`);
+    button.dataset.body=body.id;button.setAttribute('aria-label',`Focus on ${body.name}`);
     button.style.setProperty('--body-color',body.color);
-    button.innerHTML=`<span class="solar-hit__dot" aria-hidden="true"></span>`;
-    button.addEventListener('click',()=>select(body.id));markers.append(button);markerMap.set(body.id,button);
+    button.innerHTML=body.id==='sun'?'<span class="solar-hit__dot solar-hit__sun" aria-hidden="true">✦</span>':'<span class="solar-hit__dot" aria-hidden="true"></span>';
+    button.addEventListener('click',()=>select(body.id,true));markers.append(button);markerMap.set(body.id,button);
     const pick=document.createElement('button');pick.type='button';pick.className='planet-chip';pick.dataset.body=body.id;
-    pick.innerHTML=`<span class="planet-chip__orb" aria-hidden="true"></span><span>${body.name}</span>`;
     pick.style.setProperty('--body-color',body.color);
-    pick.addEventListener('click',()=>select(body.id));picker.append(pick);pickerMap.set(body.id,pick);
+    const symbol=document.createElement('span');symbol.className='planet-chip__orb';symbol.setAttribute('aria-hidden','true');
+    const name=document.createElement('span');name.textContent=body.name;pick.append(symbol,name);
+    pick.addEventListener('click',()=>{
+      select(body.id,true);
+      root.scrollIntoView({block:'center',behavior:reduced.matches?'auto':'smooth'});
+    });picker.append(pick);pickerMap.set(body.id,pick);
   }
-  function select(id) {
+
+  function startCameraTransition(nextId) {
+    focusedId=nextId;
+    root.classList.toggle('is-focused',Boolean(nextId));
+    returnButton.hidden=!nextId;
+    markers.setAttribute('aria-hidden',String(Boolean(nextId)));
+    for(const control of markerMap.values())control.tabIndex=nextId?-1:0;
+    const body=nextId?BODY_BY_ID[nextId]:null;
+    if(body){
+      fallback.dataset.body=body.id;fallback.style.setProperty('--focus-color',body.color);
+      fallbackName.textContent=body.name;
+    }
+    const p=nextId?positions()[nextId]:{x:0,y:0};
+    const to=nextId?{x:p.x,y:p.y,zoom:focusZoomFor(body)}:CAMERA_OVERVIEW;
+    transition=transitionCamera(cameraState,to,performance.now(),reduced.matches?1:FOCUS_DURATION_MS);
+    if(reduced.matches){cameraState={...to};transition=null;renderOnce();}
+    else start();
+  }
+  function select(id,focus=false) {
     const body=BODY_BY_ID[id];if(!body)return;
-    active=id;
-    document.body.dataset.planet=id;
+    active=id;document.body.dataset.planet=id;
     document.body.style.setProperty('--planet-accent',body.accent);
     document.body.style.setProperty('--planet-bg',body.background);
     document.body.style.setProperty('--planet-glow',body.glow);
-    title.textContent=body.name; kind.textContent=body.kind;
+    title.textContent=body.name;kind.textContent=body.kind;
     display.textContent=body.description;facts.textContent=body.fact;
-    for (const [key,element] of markerMap)element.setAttribute('aria-pressed',String(key===id));
-    for (const [key,element] of pickerMap)element.setAttribute('aria-pressed',String(key===id));
-    status.textContent=`${body.name} selected. Website colors now match ${body.name}.`;
-    // The SVG remains a usable 2D explorer when WebGL is unavailable.
+    for(const [key,node] of markerMap)node.setAttribute('aria-pressed',String(key===id));
+    for(const [key,node] of pickerMap)node.setAttribute('aria-pressed',String(key===id));
+    status.textContent=`${body.name} selected. ${focus?'Camera focusing on this world.':'Choose a planet to explore.'}`;
+    if(focus)startCameraTransition(id);
   }
+  returnButton.addEventListener('click',()=>{
+    startCameraTransition(null);
+    status.textContent='Returned to the full solar system view.';
+    markerMap.get(active)?.focus();
+  });
   picker.addEventListener('keydown',event=>{
     if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
     const items=[...pickerMap.values()],i=items.indexOf(document.activeElement);
@@ -57,99 +91,152 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     const next=event.key==='Home'?0:event.key==='End'?items.length-1:(i+(event.key==='ArrowRight'?1:-1)+items.length)%items.length;
     items[next].focus();items[next].click();
   });
+
   function positionDom(t) {
-    const positions=positionsAt(t);
+    const locations=positionsAt(t);
     for(const [id,button] of markerMap){
-      const p=positions[id];
-      button.style.left=`calc(50% + ${p.x*worldScale}px)`;
-      button.style.top=`calc(50% - ${p.y*worldScale}px)`;
+      const p=locations[id];button.style.left=`calc(50% + ${p.x}px)`;button.style.top=`calc(50% - ${p.y}px)`;
       button.style.zIndex=String(8+Math.round(p.z));
     }
-    const earth=positions.earth;
-    moonTrack.setAttribute('cx',String(earth.x+220)); // SVG has viewBox -220 -220 440 440
-    moonTrack.setAttribute('cy',String(220-earth.y));
+    moonTrack.setAttribute('cx',String(locations.earth.x+220));
+    moonTrack.setAttribute('cy',String(220-locations.earth.y));
   }
-  // An SVG viewBox includes all orbital radii; scalable in CSS regardless of screen width.
-  svg.setAttribute('viewBox','0 0 440 440');
-  for(const track of svg.querySelectorAll('ellipse')){
-    track.setAttribute('cx','220');track.setAttribute('cy','220');
+  function updateMeshes(dt){
+    const locations=positions();
+    for(const [id,mesh] of meshes){
+      const p=locations[id];mesh.position.set(p.x,p.y,p.z);
+      if(dt)mesh.rotation.y+=dt*(id==='sun'?.035:.065);
+    }
+    return locations;
   }
-  // DOM marker coordinates are in fixed px because the scene itself is a 440px design canvas,
-  // scaled as a unit with CSS on narrower viewports.
+  function updateCamera(nowMs,dt,locations) {
+    if(!camera)return;
+    const movingTarget=focusedId?locations[focusedId]:{x:0,y:0};
+    if(transition){
+      const target={x:movingTarget.x,y:movingTarget.y,zoom:focusedId?focusZoomFor(BODY_BY_ID[focusedId]):1};
+      const result=sampleCamera(transition,nowMs,target);
+      cameraState={x:result.x,y:result.y,zoom:result.zoom};
+      if(result.complete)transition=null;
+    }else if(focusedId){
+      // Track each orbiting planet smoothly after the cinematic move ends.
+      cameraState.x=movingTarget.x;cameraState.y=movingTarget.y;
+    }
+    const k=Math.min(1,dt*1.7);
+    cameraParallax.x+=(desiredParallax.x-cameraParallax.x)*k;
+    cameraParallax.y+=(desiredParallax.y-cameraParallax.y)*k;
+    const px=focusedId?cameraParallax.x*.10:cameraParallax.x;
+    const py=focusedId?cameraParallax.y*.10:cameraParallax.y;
+    camera.position.set(cameraState.x+px,cameraState.y+py,520);
+    camera.lookAt(cameraState.x,cameraState.y,0);
+    camera.zoom=cameraState.zoom;camera.updateProjectionMatrix();
+  }
+  function paint(nowMs,dt){
+    positionDom(elapsed);
+    if(!webglReady||!renderer)return;
+    const locations=updateMeshes(dt);
+    updateCamera(nowMs,dt,locations);
+    if(stars&&dt)stars.rotation.z+=dt*.0007;
+    renderer.render(scene,camera);
+  }
   function tick(now){
     raf=0;
-    if(!sceneMotion.visible||!sceneMotion.intersecting||!sceneMotion.enabled)return;
+    if(!motion.visible||!motion.intersecting||!motion.enabled)return;
     const dt=last?Math.min(.05,(now-last)/1000):0;
     last=now;elapsed+=dt;
-    positionDom(elapsed);
-    if(webglReady){
-      const positions=positionsAt(elapsed);
-      for(const [id,mesh] of meshes){ const p=positions[id];mesh.position.set(p.x,p.y,p.z);mesh.rotation.y+=dt*.12; }
-      cameraNow.x+=(cameraTarget.x-cameraNow.x)*Math.min(1,dt*1.8);
-      cameraNow.y+=(cameraTarget.y-cameraNow.y)*Math.min(1,dt*1.8);
-      camera.position.x=cameraNow.x;camera.position.y=cameraNow.y;camera.lookAt(0,0,0);
-      if(stars)stars.rotation.z+=dt*.001;
-      renderer.render(scene,camera);
-    }
+    paint(now,dt);
     raf=requestAnimationFrame(tick);
   }
   function stop(){if(raf)cancelAnimationFrame(raf);raf=0;last=0;}
-  function start(){if(!sceneMotion.visible||!sceneMotion.intersecting||!sceneMotion.enabled)return;if(!raf)raf=requestAnimationFrame(tick);}
-  function renderOnce(){positionDom(elapsed);if(webglReady&&renderer){for(const [id,mesh] of meshes){const p=positionsAt(elapsed)[id];mesh.position.set(p.x,p.y,p.z);}renderer.render(scene,camera);}}
-  const visibilityHandler=()=>{sceneMotion.visible=!document.hidden;if(sceneMotion.visible)start();else stop();};
-  const motionHandler=()=>{sceneMotion.enabled=!reduced.matches;if(sceneMotion.enabled)start();else {stop();renderOnce();}};
-  document.addEventListener('visibilitychange',visibilityHandler);
-  reduced.addEventListener?.('change',motionHandler);
+  function start(){if(disposed||!motion.visible||!motion.intersecting||!motion.enabled)return;if(!raf)raf=requestAnimationFrame(tick);}
+  function renderOnce(){paint(performance.now(),0);}
+  const onVisibility=()=>{motion.visible=!document.hidden;if(motion.visible)start();else stop();};
+  const onMotion=()=>{motion.enabled=!reduced.matches;if(motion.enabled)start();else{stop();renderOnce();}};
+  document.addEventListener('visibilitychange',onVisibility);
+  reduced.addEventListener?.('change',onMotion);
   const observer=typeof IntersectionObserver==='undefined'?null:new IntersectionObserver(entries=>{
-    sceneMotion.intersecting=entries[0]?.isIntersecting??false;
-    if(sceneMotion.intersecting)start();else stop();
+    motion.intersecting=entries[0]?.isIntersecting??false;
+    if(motion.intersecting)start();else stop();
   },{rootMargin:'100px'});
   observer?.observe(root);
   root.addEventListener('pointermove',event=>{
-    if(!sceneMotion.enabled)return;
-    const box=root.getBoundingClientRect();
-    cameraTarget.x=((event.clientX-box.left)/box.width-.5)*5;
-    cameraTarget.y=(.5-(event.clientY-box.top)/box.height)*5;
+    if(!motion.enabled)return;
+    const bounds=root.getBoundingClientRect();
+    if(!bounds.width||!bounds.height)return;
+    desiredParallax={x:((event.clientX-bounds.left)/bounds.width-.5)*3,
+      y:(.5-(event.clientY-bounds.top)/bounds.height)*3};
   },{passive:true});
-  root.addEventListener('pointerleave',()=>{cameraTarget.x=0;cameraTarget.y=0;});
-  select(INITIAL_BODY);
+  root.addEventListener('pointerleave',()=>{desiredParallax={x:0,y:0};});
+
+  select(INITIAL_BODY,false);
   positionDom(elapsed);
-  async function initializeThree() {
-    // Failure here does not affect the DOM orrery, themes or any resume content.
-    try {
-      if (!window.WebGL2RenderingContext) throw Error('WebGL2 unavailable');
-      const gl=canvas.getContext('webgl2',{alpha:true,antialias:false,powerPreference:'low-power'});
-      if(!gl)throw Error('WebGL context unavailable');
+  async function initializeThree(){
+    try{
+      if(!window.WebGL2RenderingContext)throw Error('WebGL2 is not available');
+      const gl=canvas.getContext('webgl2',{alpha:true,antialias:true,powerPreference:'low-power'});
+      if(!gl)throw Error('WebGL context initialization failed');
       const THREE=await import('https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js');
-      // Avoid creating GPU context if the canvas is detached during loading.
-      if(!canvas.isConnected)return;
-      const scene3=new THREE.Scene();scene=scene3;
-      camera=new THREE.OrthographicCamera(-220,220,220,-220,1,1200);camera.position.set(0,0,520);camera.lookAt(0,0,0);
-      renderer=new THREE.WebGLRenderer({canvas,context:gl,alpha:true,antialias:false,powerPreference:'low-power'});
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));renderer.setSize(440,440,false);
-      scene.add(new THREE.AmbientLight(0xb0c5eb,1.75));
-      const point=new THREE.PointLight(0xffd9ac,80,450,1);point.position.set(0,0,35);scene.add(point);
-      const geometry=new THREE.SphereGeometry(1,20,14);
+      if(disposed||!canvas.isConnected)return;
+      threeModule=THREE;
+      scene=new THREE.Scene();
+      camera=new THREE.OrthographicCamera(-220,220,220,-220,1,1200);
+      camera.position.set(0,0,520);
+      renderer=new THREE.WebGLRenderer({canvas,context:gl,alpha:true,antialias:true,powerPreference:'low-power'});
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+      renderer.setSize(440,440,false);renderer.outputColorSpace=THREE.SRGBColorSpace;
+      scene.add(new THREE.AmbientLight(0xd9e2f5,.68));
+      const sunlight=new THREE.PointLight(0xffefd4,4800,0,2);sunlight.position.set(0,0,24);scene.add(sunlight);
+      const geometry=new THREE.SphereGeometry(1,72,48);
       for(const body of SOLAR_BODIES){
-        const material=new THREE.MeshStandardMaterial({color:body.color,roughness:body.id==='sun'?.5:.85,metalness:0,emissive:body.id==='sun'?body.color:'#000000',emissiveIntensity:body.id==='sun'?1.5:0});
-        const mesh=new THREE.Mesh(geometry,material);mesh.scale.setScalar(body.size*.75);scene.add(mesh);meshes.set(body.id,mesh);
-        if(body.id==='saturn'){
-          const ring=new THREE.Mesh(new THREE.RingGeometry(body.size*.9,body.size*1.35,64),new THREE.MeshBasicMaterial({color:0xc8b796,transparent:true,opacity:.6,side:THREE.DoubleSide,depthWrite:false}));
-          ring.rotation.x=.45;mesh.add(ring);
+        const texture=createSurfaceTexture(THREE,body.id);
+        const material=body.id==='sun'
+          ?new THREE.MeshBasicMaterial({map:texture||null,color:texture?'#ffffff':body.color})
+          :new THREE.MeshStandardMaterial({map:texture||null,color:texture?'#ffffff':body.color,roughness:body.id==='earth'?.76:1,metalness:0});
+        const mesh=new THREE.Mesh(geometry,material);
+        mesh.scale.setScalar(body.size*.75);
+        scene.add(mesh);meshes.set(body.id,mesh);
+        if(['earth','venus','uranus','neptune','sun'].includes(body.id)){
+          mesh.add(createAtmosphere(THREE,body.glow,body.id==='sun'?.65:.47));
         }
+        addRings(THREE,mesh,body.id);
       }
-      const starGeometry=new THREE.BufferGeometry(),coords=[];
-      for(let i=0;i<170;i++){const a=i*2.39996322972865;const r=Math.sqrt((i+1)/170)*320;coords.push(Math.cos(a)*r,Math.sin(a)*r,(i*17)%190-120);}
+      const coords=[],starGeometry=new THREE.BufferGeometry();
+      for(let i=0;i<190;i++){
+        const angle=i*2.39996322972865,radius=Math.sqrt((i+1)/190)*315;
+        coords.push(Math.cos(angle)*radius,Math.sin(angle)*radius,-140+(i*31)%250);
+      }
       starGeometry.setAttribute('position',new THREE.Float32BufferAttribute(coords,3));
-      stars=new THREE.Points(starGeometry,new THREE.PointsMaterial({color:0xb3c8ff,size:1.05,sizeAttenuation:false,transparent:true,opacity:.75}));scene.add(stars);
-      webglReady=true;root.classList.add('has-three');
+      stars=new THREE.Points(starGeometry,new THREE.PointsMaterial({color:0xb2c9fd,size:1.1,sizeAttenuation:false,transparent:true,opacity:.70}));
+      scene.add(stars);
+      webglReady=true;
+      root.classList.add('has-three');root.classList.remove('solar-fallback');
+      if(focusedId)startCameraTransition(focusedId);
       renderOnce();start();
-      canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();webglReady=false;stop();root.classList.remove('has-three');status.textContent='3D view paused. Planet explorer remains available.';},{once:true});
-    }catch(error){console.warn('3D solar scene unavailable, using accessible 2D orbit fallback',error);root.classList.add('solar-fallback');status.textContent='2D planetary explorer ready.';}
+      canvas.addEventListener('webglcontextlost',event=>{
+        event.preventDefault();webglReady=false;stop();root.classList.remove('has-three');
+        root.classList.add('solar-fallback');
+        status.textContent='Graphics temporarily unavailable. Interactive 2D planet explorer remains available.';
+      });
+    }catch(error){
+      console.warn('Using 2D planet fallback:',error);
+      root.classList.add('solar-fallback');
+      status.textContent='Accessible 2D planet explorer ready.';
+    }
   }
-  // Allow content to paint first; loading an optional 3D scene cannot block the page.
-  if(!reduced.matches)initializeThree();
-  else {root.classList.add('solar-fallback');renderOnce();}
+  if(!reduced.matches)initializeThree();else {root.classList.add('solar-fallback');renderOnce();}
   start();
-  return ()=>{stop();observer?.disconnect();document.removeEventListener('visibilitychange',visibilityHandler);reduced.removeEventListener?.('change',motionHandler);renderer?.dispose();};
+  return ()=>{
+    disposed=true;stop();observer?.disconnect();
+    document.removeEventListener('visibilitychange',onVisibility);
+    reduced.removeEventListener?.('change',onMotion);
+    if(threeModule){
+      for(const mesh of meshes.values()){
+        mesh.material.map?.dispose?.();mesh.material.dispose();
+        for(const child of mesh.children){child.material?.dispose?.();child.geometry?.dispose?.();}
+      }
+      stars?.geometry.dispose();stars?.material.dispose();
+      // Sphere geometry is shared, dispose it only once.
+      meshes.values().next().value?.geometry.dispose();
+    }
+    renderer?.dispose();
+  };
 }

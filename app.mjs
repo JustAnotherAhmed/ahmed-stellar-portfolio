@@ -48,7 +48,7 @@ const commands = [
   { label: 'About & education', hint: '04 / PROFILE', target: '#about', icon: '⌁' },
   { label: 'Contact Ahmed', hint: '05 / SAY HELLO', target: '#contact', icon: '↗' },
   { label: 'Web design lab', hint: 'INTERACTIVE / LIVE PREVIEW', target: '#web-lab', icon: '◈' },
-  { label: 'Knowledge arcade', hint: 'BONUS / GENERAL QUIZ', target: '#signal', icon: '✧' },
+  { label: 'Technical AI quiz', hint: 'BONUS / CHOOSE A TOPIC', target: '#signal', icon: '✧' },
   { label: 'Solar system explorer', hint: 'EXPLORE / PLANETS', target: '#top', icon: '◉' },
 ];
 
