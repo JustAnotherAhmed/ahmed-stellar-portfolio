@@ -1,99 +1,68 @@
-# Ahmed Osama · Stellar Portfolio v3
+# Ahmed Osama — Stellar Portfolio v4 (Free Offline Quiz)
 
-A premium, accessible, single-page personal portfolio built with **semantic HTML, CSS, and vanilla JavaScript ES modules**. No React, Node dependencies or compilation is required. Existing résumé sections and the WhatsApp contact link are retained.
+A lightweight accessible vanilla JavaScript portfolio with a cinematic Three.js planet explorer, working WebGL/SVG fallback, and a **completely free local technical quiz**. No API keys, models, token credits, registrations, databases, installs, or backend hosting are required.
 
-## Quick start
+## Run locally
 
-1. Extract this entire ZIP into one folder. **Keep the files in the project root** (especially `index.html`, `app.mjs`, `styles.css` and `vercel.json`).
-2. Use a local static server (ES modules cannot reliably load from `file://`):
+Requirements: Python 3 or any basic local static server; Node.js 20+ for automated tests.
 
-   ```bash
-   python -m http.server 8000
-   ```
+```bash
+python -m http.server 8000
+# Open http://localhost:8000
+```
 
-3. Open `http://localhost:8000` in a current browser.
-4. For the online WebGL Three.js scene, the browser must be able to reach `https://cdn.jsdelivr.net`. If it cannot, the accessible animated 2D orbit explorer remains fully usable.
+You can explore the full portfolio without JavaScript. The interactive solar system and quiz need JavaScript. Three.js is loaded from a pinned CDN when WebGL is supported; if unavailable, the interactive SVG fallback remains.
 
-There are **no `npm install` or `npm run build` steps**. With modern browsers supporting CSS `color-mix`, WebGL2 and ES modules, the full experience is available. Older/restricted devices use the 2D fallback instead of crashing.
-
-## Deploy / update Vercel
-
-The project remains compatible with the existing GitHub→Vercel setup.
-
-- Framework: **Other**
-- Root directory: `./`
-- Build command: **empty**
-- Output directory: `.`
-- Environment variables: **none**
-
-Push all top-level files to the existing GitHub repository; Vercel's Git integration deploys commits on its production branch. You can also deploy the unzipped root directory through a static-hosting workflow. Do **not** upload a ZIP as though it were a single website file.
-
-## Architecture
-
-| File | Responsibility |
-| --- | --- |
-| `index.html` | Recruiter-first résumé, projects, design laboratory, solar-explorer and quiz shells |
-| `styles.css` | Design system, planet-shifted colors, responsive layout, reduced-motion and interactive styles |
-| `app.mjs` | Existing navigation, filters, command palette, website-design lab and safe feature initializers |
-| `planets.mjs` | Solar body facts, scaled orbital model, theme tokens, and WCAG contrast calculation helpers |
-| `solar-system.mjs` | 2D SVG orbital paths, keyboard/mouse planet controls, Three.js WebGL2 scene, animation lifecycle, fallback |
-| `question-bank.mjs` | 45 curated multiple-choice questions (15 per difficulty) spanning science, history, geography, arts and computing |
-| `quiz.mjs` | Pure quiz state machine, Fisher–Yates shuffle, scores, correctness and no-repeat behavior |
-| `quiz-ui.mjs` | Accessible browser quiz UI with immediate feedback, continue, replay and stop controls |
-| `*.test.mjs` | Unit/structural regression tests (Node standard test runner) |
-| `smoke_browser.py` | Optional browser smoke checks, including WebGL-disabled fallback |
-| `vercel.json` | Static host configuration and security headers |
-| `Ahmed-Osama-Resume.pdf` | Source résumé used for download |
-
-### Solar scene design
-
-- **Hybrid rendering:** SVG ellipses remain visible as 2D orbital paths. A Three.js `WebGLRenderer` paints spherical bodies and sparse star points behind the transparent SVG/DOM controls.
-- Relative orbit periods and radius proportions are **illustrative, not astronomically to scale**. Mercury moves fastest, outer planets slowest, and the Moon travels around the moving Earth.
-- The camera includes subtle pointer parallax. Device pixel ratio is capped, point count is small, and the frame loop pauses when the tab is hidden or the orrery is offscreen.
-- Under `prefers-reduced-motion: reduce`, motion is not started. Failed WebGL initialization, missing CDN, or lost graphics context never hides the fact panel, theme buttons or résumé.
-- Each Sun/planet/Moon selection updates the body fact card and CSS theme variables. All theme palette foreground/background pairs are tested for at least **4.5:1** contrast.
-
-### General knowledge quiz design
-
-- Player selects **Easy**, **Medium**, or **Hard**. Each level contains 15 distinct four-choice questions drawn from a separate data module.
-- Questions are Fisher–Yates shuffled at the start of each run; the opening questions are explicitly changed for consecutive runs of the same difficulty. Each question appears at most once **within one game session**.
-- An answer immediately locks and displays whether it was correct plus a brief explanation. The score increases only on a correct answer.
-- Players can answer 10 questions, stop at any time, replay a fresh subset, or switch difficulty. Replaying starts a new session; extending a bank is straightforward.
-
-## Tests
-
-Node 20+ is recommended (no packages to install):
+## Test
 
 ```bash
 node --test *.test.mjs
 ```
 
-Checks cover body count and facts, orbit geometry, theme contrast ratios for every body, question bank validity and breadth, deterministic shuffle and no-repeat logic, feedback/score/stop, static assets, fallback/error-handling declarations, and Vercel configuration.
-
-Optional browser smoke tests:
+Browser smoke test (optional, requires Playwright Python and Chrome/Chromium):
 
 ```bash
-python -m pip install playwright
-python -m playwright install chromium
 python smoke_browser.py
 ```
 
-The smoke test loads modules into an isolated browser page and intentionally exercises the WebGL-unavailable path. It clicks planets/themes, starts a quiz, answers questions, verifies the design lab and WhatsApp link, and checks mobile overflow. The bundled script assumes `/usr/bin/chromium` on Linux; modify `executable_path` to use your local browser on other platforms.
+## Deploy to Vercel
 
-## Customize
+Connect the root of your GitHub repository to Vercel; framework **Other**, output directory `.`, root `./`, and **no build command**. Existing `vercel.json` contains static security headers. A push to the connected `main` branch redeploys automatically.
 
-- **Portfolio copy:** edit `index.html` directly. Search for `id="work"`, `id="experience"`, `id="skills"`, `id="about"`, and `id="contact"`. Resume-linked information is sourced from the user's uploaded PDF; do not replace measurements with invented ones.
-- **WhatsApp:** in `index.html`, search for `https://wa.me/971521133465` and edit the country-code number and prefilled message as necessary.
-- **Solar bodies/facts:** update `SOLAR_BODIES` in `planets.mjs`. Data includes accessible name, description, fact, colors, size and scaled orbit period. Facts are short paraphrases of NASA's Solar System Exploration resources.
-- **Theme colors:** adjust `accent` and `background` in `planets.mjs`; rerun the contrast tests. Every theme keeps light text over a dark background.
-- **Quiz topics:** add an entry to the appropriate array in `question-bank.mjs` as `[id, topic, question, [option1,option2,option3,option4], correctOption, explanation]`. Keep IDs unique, answer options distinct, and the correct answer included in the options.
-- **Resume:** replace `Ahmed-Osama-Resume.pdf` with a file using the same filename.
+No environment variables are required. You do **not** need an OpenAI API key or a Vercel Function. This edition removes the previous `api/` directory and the AI-generation feature entirely.
 
-## External resources and factual sources
+## Architecture
 
-- **Three.js** 0.187.0 (MIT license), pinned ESM CDN delivery: https://github.com/mrdoob/three.js . The library is **optional at runtime**; the portfolio and SVG/DOM orbital controls remain functional when the CDN cannot be reached. No other runtime scripts, trackers or web-font network requests are used.
-- Solar-system descriptions and facts verified against **NASA Science**: https://science.nasa.gov/solar-system/solar-system-facts/ and https://science.nasa.gov/planetary-science/focus-areas/ .
+| File | Purpose |
+|---|---|
+| `index.html`, `styles.css` | Accessible résumé, solar controls, responsive layouts and offline quiz form |
+| `app.mjs` | Navigation, project filtering, commands and optional interactive initialization |
+| `solar-system.mjs` | Three.js scene, planet picker, cinematic zoom and return, graphics fallback, motion lifecycle |
+| `camera-focus.mjs` | Pure easing and camera interpolation, independently tested |
+| `planet-textures.mjs` | Procedural surfaces, atmosphere, sunlight and planet-appropriate ring geometry |
+| `planets.mjs` | Solar facts, positions, theme palettes and accessibility contrast calculations |
+| `quiz-bank.mjs` | 108 curated technical questions in 6 categories and 3 difficulty levels |
+| `quiz.mjs` | Pure no-repeat deck selection, choice shuffling, scoring and state transitions |
+| `quiz-ui.mjs` | Topic/difficulty picker and accessible multiple-choice experience |
+| `*.test.mjs` | Node test suite for bank, scoring, camera, assets and accessibility |
+| `vercel.json` | Build-free static deployment and security headers |
 
-## Graceful degradation and accessibility
+## Quiz details
 
-The critical résumé is static HTML, so it remains readable if scripts fail. Planet selection uses real buttons with names and `aria-pressed`; the keyboard-accessible selector supports Arrow Left/Right, Home and End. Quiz answers use real buttons, with status announcements for feedback. Focus styles, skip navigation and reduced-motion preferences are respected throughout. No game gates access to contact details.
+The user selects a topic: **Surprise me**, **AI & ML**, **Neural Networks**, **Python**, **Cybersecurity**, **Web Development**, or **Databases & SQL**. The user selects **Beginner**, **Intermediate** or **Advanced**. Each round samples five distinct questions, randomizes answer order, gives feedback and keeps score. Replays prefer previously unseen questions where possible. **Topics are deliberately limited to the bundled bank**; the quiz does not claim to generate custom new questions for arbitrary prompts.
+
+To update quiz content, edit `quiz-bank.mjs`. Each entry has one question, correct answer, three distractors and a factual explanation. After edits run `node --test *.test.mjs`. The `TOPICS` list and data must stay in sync.
+
+## Planet explorer
+
+Selecting the Sun, one of the eight planets or the Moon updates the page theme and animates the camera toward the chosen body with a 1.45-second eased transition. **Return to orbit** restores the overview. Planet surfaces are procedural approximations rather than NASA photo textures. Saturn's ring dimensions were corrected to prevent the oversized yellow ring from the prior version. Motion is reduced or paused when appropriate; the SVG/2D planet selector works without WebGL.
+
+## Editing résumé and contacts
+
+The résumé sections are in `index.html`. The downloadable PDF is `Ahmed-Osama-Resume.pdf`. The WhatsApp button uses the verified résumé contact number and the email-copy control remains. Keep the HTML, PDF, and real professional claims consistent when changing information.
+
+## Limitations and dependencies
+
+The **quiz works fully offline once the website files are loaded**. The 3D Three.js layer is a free, pinned, open-source CDN dependency and needs internet the first time unless a local copy is bundled. It always has a no-WebGL/no-CDN fallback. There are no paid AI-provider calls.
+
+References: [Three.js](https://threejs.org/) (MIT license), [NASA Solar System](https://science.nasa.gov/solar-system/).

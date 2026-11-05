@@ -505,3 +505,48 @@ body::before {
   body,.site-header,.cosmos,.btn,.project-card,.solar-stage canvas,.solar-info-card,.quiz-difficulty {transition:none!important;animation:none!important;}
   .project-card:hover,.quiz-difficulty:hover {transform:none;}
 }
+
+/* ====== v4: cinematic planet focus & technical AI quiz ====== */
+/* The oversized yellow Saturn ring from v3 was caused by multiplying RingGeometry by body.size twice.
+   Rings in the 3D module now use unit-sphere radii. The decorative circular aura is removed. */
+.solar-aura { display:none !important; }
+.solar-hit[data-body="sun"] .solar-hit__sun { width:auto;height:auto;background:none;box-shadow:none;color:#ffe5aa;font-size:26px;line-height:1;text-shadow:0 0 17px #eeb365; }
+.solar-return { position:absolute;z-index:20;right:17px;top:13px;padding:10px 14px;border:1px solid #8badd0;border-radius:9px;background:rgba(13,24,45,.93);color:#f6f9ff;font-weight:700;font-size:11px;box-shadow:0 7px 22px #0006; }
+.solar-return:hover { border-color:var(--cyan);background:#213b5b; }
+.orbit-scene .solar-orbits,.orbit-scene .solar-markers { transition:opacity .45s ease; }
+.orbit-scene.is-focused .solar-orbits,.orbit-scene.is-focused .solar-markers {opacity:0;pointer-events:none;}
+.solar-closeup { position:absolute;inset:0;opacity:0;pointer-events:none;display:grid;place-items:center;z-index:4;transition:opacity .45s ease; }
+.solar-fallback.is-focused .solar-closeup {opacity:1;}
+.solar-closeup__sphere { width:242px;aspect-ratio:1;position:relative;border-radius:50%;background:radial-gradient(circle at 30% 28%,#fff8,#fff0 38%),repeating-linear-gradient(177deg,#6ba1cd 0 15px,#245d89 18px 24px,#6185bf 31px 37px);box-shadow:inset -36px -19px 62px #000b,inset 20px 15px 40px #fff3,0 0 65px color-mix(in srgb,var(--focus-color,#6ba9e6) 20%,transparent); }
+.solar-closeup > span {position:absolute;bottom:42px;letter-spacing:.17em;font:11px Consolas,monospace;color:#f9fcff;text-shadow:0 1px 7px #000;}
+.solar-closeup[data-body="sun"] .solar-closeup__sphere {background:radial-gradient(circle at 32% 31%,#fff1b1,#ffb844 44%,#c85121 83%);}
+.solar-closeup[data-body="mercury"] .solar-closeup__sphere,.solar-closeup[data-body="moon"] .solar-closeup__sphere {background:radial-gradient(circle at 30% 24%,#c4c3c3,#77747a 45%,#363840 95%),repeating-radial-gradient(circle at 20% 40%,#888 0 3px,#999 5px 9px);}
+.solar-closeup[data-body="venus"] .solar-closeup__sphere {background:repeating-linear-gradient(172deg,#f0d0a1 0 15px,#b98c63 19px 28px,#d5b08b 36px 50px);}
+.solar-closeup[data-body="earth"] .solar-closeup__sphere {background:radial-gradient(circle at 36% 30%,#fff9 0 4%,transparent 12%),radial-gradient(ellipse at 45% 61%,#2d9358 0 14%,transparent 20%),radial-gradient(ellipse at 22% 24%,#638c48 0 10%,transparent 19%),radial-gradient(circle at 38% 30%,#2488c7,#093b79 80%);}
+.solar-closeup[data-body="mars"] .solar-closeup__sphere {background:radial-gradient(circle at 37% 30%,#d9956a,#a14d36 66%,#5b251f);}
+.solar-closeup[data-body="jupiter"] .solar-closeup__sphere {background:repeating-linear-gradient(171deg,#d5ad88 0 15px,#b8856c 19px 30px,#f0dec5 38px 49px,#8e6252 55px 65px);}
+.solar-closeup[data-body="saturn"] .solar-closeup__sphere {background:repeating-linear-gradient(179deg,#f2e3c6 0 21px,#b79d79 23px 39px,#dfcba7 41px 61px);}
+.solar-closeup[data-body="saturn"] .solar-closeup__sphere::after {content:'';position:absolute;inset:26% -30%;border:15px solid #c5af8ac9;border-left-color:#eee0c4b8;border-right-color:#a58d70c0;border-radius:50%;transform:rotate(-23deg) scaleY(.6);}
+.solar-closeup[data-body="uranus"] .solar-closeup__sphere {background:repeating-linear-gradient(175deg,#afe6db 0 28px,#6bbec5 30px 53px);}
+.solar-closeup[data-body="neptune"] .solar-closeup__sphere {background:repeating-linear-gradient(174deg,#5988d8 0 30px,#284fa7 32px 60px);}
+.solar-fallback.is-focused .solar-closeup__sphere {box-shadow:inset -40px -25px 65px #000a,inset 16px 18px 40px #fff2,0 0 90px color-mix(in srgb,var(--focus-color,#6ba9e6) 28%,transparent);}
+.quiz-topic-input {display:block;width:100%;height:52px;margin:10px 0 19px;padding:0 15px;border-radius:10px;background:#162642;color:#f3f8ff;border:1px solid #557194;font-size:14px;font-family:inherit;box-sizing:border-box;}
+.quiz-topic-input::placeholder {color:#b6c4d8;opacity:.9;}
+.quiz-topic-input:focus-visible {border-color:var(--cyan);}
+.quiz-level-label {margin-top:15px;margin-bottom:12px;}
+.quiz-difficulty[aria-pressed="true"] {border-color:var(--cyan);background:#233957;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--cyan) 35%,transparent);}
+.quiz-generate {margin-top:16px;width:100%;justify-content:center;}
+.quiz-generate:disabled {opacity:.58;cursor:wait;}
+.quiz-help {margin:13px 0 0;color:#c0cfe6;font-size:11px;line-height:1.7;}
+.quiz-loading {display:flex;align-items:center;gap:10px;color:#d8e9ff;padding:12px 0 0;font-size:12px;}
+.quiz-spinner {width:17px;height:17px;border:2px solid #7195b4;border-top-color:#e6faff;border-radius:50%;animation:quiz-spin .8s linear infinite;}
+@keyframes quiz-spin {to{transform:rotate(360deg);}}
+.quiz-error {border:1px solid #9c6e7e;background:#392a3b;border-radius:10px;padding:13px;margin-top:14px;color:#fff1ef;font-size:12px;line-height:1.6;}
+.quiz-error p {margin:0 0 12px;}
+.quiz-error .btn {min-height:36px;padding:7px 15px;}
+@media (max-width:580px){.solar-return {right:21px;top:28px;}.solar-closeup__sphere{width:220px;}.quiz-topic-input{font-size:13px;}}
+@media (prefers-reduced-motion:reduce){.solar-closeup,.orbit-scene .solar-markers,.orbit-scene .solar-orbits{transition:none!important;}.quiz-spinner{animation:none!important;}}
+
+/* Accessible offline topic selector */
+#quiz-topic {appearance: auto;cursor:pointer;color-scheme:dark;}
+#quiz-topic option {background:#162642;color:#f3f8ff;}

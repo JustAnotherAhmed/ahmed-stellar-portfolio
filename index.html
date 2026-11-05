@@ -5,7 +5,7 @@
   <meta content="width=device-width, initial-scale=1" name="viewport"/>
   <meta content="dark" name="color-scheme"/>
   <meta content="#070c1d" name="theme-color"/>
-  <meta content="solar-planet-explorer-and-knowledge-arcade-v3" name="portfolio-release"/>
+  <meta content="planet-focus-ai-technical-quiz-v4" name="portfolio-release"/>
   <title>
    Ahmed Osama | AI Automation &amp; IT Systems
   </title>
@@ -146,11 +146,14 @@
     </div>
     <div class="orbit-scene" id="solar-system" aria-label="Interactive solar system explorer">
      <div class="solar-stage">
-      <div class="solar-aura" aria-hidden="true"></div>
       <canvas id="solar-canvas" width="440" height="440" aria-hidden="true"></canvas>
       <svg id="solar-orbits" aria-hidden="true" class="solar-orbits" viewBox="0 0 440 440"></svg>
+      <div class="solar-closeup" id="solar-closeup" data-body="earth" aria-hidden="true">
+       <div class="solar-closeup__sphere"></div><span id="solar-closeup-name">Earth</span>
+      </div>
+      <button class="solar-return" id="solar-return" type="button" hidden>← Return to orbit</button>
       <div class="solar-markers" id="solar-markers" role="group" aria-label="Select a celestial body on the orbit diagram"></div>
-      <span class="solar-scene-tag" aria-hidden="true">SOLAR SYSTEM // LIVE</span>
+      <span class="solar-scene-tag" aria-hidden="true">SOLAR SYSTEM // INTERACTIVE</span>
       <span class="solar-scene-caption" aria-hidden="true">ORBITAL PERIODS · VISUALIZED</span>
      </div>
      <div class="solar-info-card" role="region" aria-label="Selected celestial body details">
@@ -1026,30 +1029,38 @@
    <section aria-labelledby="signal-title" class="section container section-game" id="signal">
     <div class="game-shell quiz-shell" id="general-quiz">
      <div class="game-copy">
-      <p class="section-kicker">BONUS / THE KNOWLEDGE ARCADE</p>
-      <h2 id="signal-title">Know a little about <em>everything?</em></h2>
-      <p>Pick your difficulty and take on a randomized, multiple-choice general-knowledge quiz. New questions each run, instant explanations, no timer and no repeats within a session.</p>
-      <div class="quiz-topic-tags"><span>SCIENCE</span><span>ART</span><span>HISTORY</span><span>TECH</span><span>GEOGRAPHY</span><span>MORE ↗</span></div>
-      <p class="quiz-optional">A side quest only. Your résumé, work and contact details never require completing a game.</p>
+      <p class="section-kicker">BONUS / THE TECH QUIZ LAB</p>
+      <h2 id="signal-title">How deep does your <em>knowledge go?</em></h2>
+      <p>Choose a technology topic and difficulty to play five randomized multiple-choice questions from a curated question bank. Instant feedback, no space trivia, no timer, no API charges.</p>
+      <div class="quiz-topic-tags"><span>AI</span><span>PYTHON</span><span>NEURAL NETWORKS</span><span>CYBERSECURITY</span><span>WEB DEVELOPMENT</span><span>DATABASES</span></div>
+      <p class="quiz-optional">The quiz is optional and completely free to play. Questions are curated and included in the website — no AI provider or API key required.</p>
      </div>
      <div class="quiz-console">
-      <div class="game-console__header"><span><i aria-hidden="true"></i> KNOWLEDGE ARCADE / v3</span><span>● ● ●</span></div>
+      <div class="game-console__header"><span><i aria-hidden="true"></i> TECH KNOWLEDGE QUIZ / OFFLINE</span><span>● ● ●</span></div>
       <div class="quiz-choose" id="quiz-choose">
-       <p class="quiz-console-label">SELECT A DIFFICULTY</p>
-       <div class="quiz-difficulties" id="quiz-difficulty" role="group" aria-label="Quiz difficulty"></div>
-       <p>10 random questions per run. Choose another run to keep playing.</p>
+       <form id="quiz-form" novalidate>
+        <label class="quiz-console-label" for="quiz-topic">CHOOSE A TECH TOPIC</label>
+        <select class="quiz-topic-input" id="quiz-topic" name="topic" required><option value="all">Surprise me — all tech topics</option><option value="ai">Artificial intelligence &amp; ML</option><option value="neural">Neural networks</option><option value="python">Python</option><option value="security">Cybersecurity</option><option value="web">Web development</option><option value="data">Databases &amp; SQL</option></select>
+        <p class="quiz-console-label quiz-level-label">SELECT A DIFFICULTY</p>
+        <div class="quiz-difficulties" id="quiz-difficulty" role="group" aria-label="Quiz difficulty"></div>
+        <button class="btn btn-primary quiz-generate" id="quiz-generate" type="submit">Start free quiz ↗</button>
+        <div class="quiz-error" id="quiz-error" hidden role="alert">
+         <p id="quiz-error-text"></p><button class="btn btn-secondary" id="quiz-retry" type="button">Try again ↻</button>
+        </div>
+        <p class="quiz-help">Five questions per round. Everything runs in your browser, without account registration, internet requests, or AI API credits.</p>
+       </form>
       </div>
       <div class="quiz-active" id="quiz-active" hidden>
        <div class="quiz-progress-row"><span id="quiz-progress"></span><strong id="quiz-score">SCORE 0</strong></div>
        <h3 tabindex="-1" id="quiz-question"></h3>
-       <div class="quiz-options" id="quiz-options" role="group" aria-label="Multiple choice answers"></div>
+       <div class="quiz-options" id="quiz-options" role="group" aria-label="Multiple-choice answers"></div>
        <p class="quiz-feedback" id="quiz-feedback" role="status" aria-live="polite"></p>
        <div class="game-controls"><button class="btn btn-primary" id="quiz-next" type="button" hidden>Next question →</button><button class="game-exit" id="quiz-stop" type="button">Stop playing</button></div>
       </div>
       <div class="quiz-complete" id="quiz-complete" hidden>
-       <span class="complete-icon" aria-hidden="true">✦</span><h3>All questions explored.</h3>
+       <h3>Round complete ✦</h3>
        <p id="quiz-final-score" aria-live="polite"></p>
-       <div class="quiz-finish-buttons"><button class="btn btn-primary" id="quiz-play-again" type="button">Play another round ↗</button><button class="btn btn-secondary" id="quiz-change-difficulty" type="button">Change difficulty</button></div>
+       <div class="quiz-finish-buttons"><button class="btn btn-primary" id="quiz-play-again" type="button">Play another round ↗</button><button class="btn btn-secondary" id="quiz-change-difficulty" type="button">Change topic or level</button></div>
       </div>
       <p id="quiz-status" role="status" aria-live="polite" class="quiz-status"></p>
      </div>
@@ -1153,7 +1164,7 @@
   </dialog>
   <noscript>
    <div class="noscript-notice">
-    The full r&eacute;sum&eacute; and work history remain available. Enable JavaScript for the optional solar explorer, design lab and general knowledge quiz.
+    The full r&eacute;sum&eacute; and work history remain available. Enable JavaScript for the optional solar explorer, design lab and AI-powered technology quiz.
    </div>
   </noscript>
  </body>
