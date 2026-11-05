@@ -22,7 +22,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   const fallback=$('#solar-closeup'),fallbackName=$('#solar-closeup-name');
   if(!canvas||!svg||!stage||!markers||!picker||!returnButton)return ()=>{};
   const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
-  const launchGate=createLaunchGate({doc:document});
+  const launchGate=createLaunchGate({doc:document,onReleased:()=>start()});
   if(!reduced.matches && window.WebGL2RenderingContext)launchGate.open(SOLAR_BODIES.length+2);
   const motion={enabled:!reduced.matches,visible:!document.hidden,intersecting:true};
   const NS='http://www.w3.org/2000/svg';
@@ -33,7 +33,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   let cameraState={...CAMERA_OVERVIEW},cameraParallax={x:0,y:0},desiredParallax={x:0,y:0};
   const meshes=new Map(),markerMap=new Map(),pickerMap=new Map();
   let disposed=false,renderQuality=1,markerScale=1,lastMarkersAt=0,frameInterval=1000/60;
-  let textureQueue=null,draggingPlanet=false;
+  let textureQueue=null,draggingPlanet=false,parallaxBounds=null,texturePaintRaf=0;
   const positions=()=>positionsAt(elapsed);
   markerScale=Math.max(.01,stage.getBoundingClientRect().width/440);
   function closeupZoom(body){
@@ -198,7 +198,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     raf=requestAnimationFrame(tick);
   }
   function stop(){if(raf)cancelAnimationFrame(raf);raf=0;last=0;}
-  function start(){if(disposed||!motion.visible||!motion.intersecting||!motion.enabled)return;if(!raf)raf=requestAnimationFrame(tick);}
+  function start(){if(disposed||launchGate.active||!motion.visible||!motion.intersecting||!motion.enabled)return;if(!raf)raf=requestAnimationFrame(tick);}
   function renderOnce(){paint(performance.now(),0);}
   const onVisibility=()=>{motion.visible=!document.hidden;if(motion.visible)start();else stop();};
   const onMotion=()=>{motion.enabled=!reduced.matches;if(motion.enabled)start();else{stop();renderOnce();}};
@@ -209,14 +209,15 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     if(motion.intersecting)start();else stop();
   },{rootMargin:'100px'});
   observer?.observe(root);
+  root.addEventListener('pointerenter',()=>{parallaxBounds=root.getBoundingClientRect();},{passive:true});
   root.addEventListener('pointermove',event=>{
-    if(!motion.enabled)return;
-    const bounds=root.getBoundingClientRect();
+    if(!motion.enabled||event.target?.closest?.('#planet-rotation-pad'))return;
+    const bounds=parallaxBounds||(parallaxBounds=root.getBoundingClientRect());
     if(!bounds.width||!bounds.height)return;
     desiredParallax={x:((event.clientX-bounds.left)/bounds.width-.5)*3,
       y:(.5-(event.clientY-bounds.top)/bounds.height)*3};
   },{passive:true});
-  root.addEventListener('pointerleave',()=>{desiredParallax={x:0,y:0};});
+  root.addEventListener('pointerleave',()=>{parallaxBounds=null;desiredParallax={x:0,y:0};});
 
   select(INITIAL_BODY,false);
   positionDom(elapsed);
@@ -267,6 +268,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       scene.add(stars);
       function syncLayout(){
         if(disposed||!renderer||!camera||!world)return;
+        parallaxBounds=null;
         const canvasRect=canvas.getBoundingClientRect(),stageRect=stage.getBoundingClientRect();
         if(canvasRect.width<1 || canvasRect.height<1 || stageRect.width<1)return;
         const frame=sceneAnchoring(canvasRect,stageRect);
@@ -288,13 +290,21 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         renderOnce();
       }
       syncLayout();
-      resizeObserver=typeof ResizeObserver==='undefined'?null:new ResizeObserver(syncLayout);
+      let resizeRaf=0;
+      const scheduleLayout=()=>{
+        if(resizeRaf)return;
+        resizeRaf=window.requestAnimationFrame(()=>{resizeRaf=0;syncLayout();});
+      };
+      resizeObserver=typeof ResizeObserver==='undefined'?null:new ResizeObserver(scheduleLayout);
       resizeObserver?.observe(hero);resizeObserver?.observe(stage);
-      window.addEventListener('resize',syncLayout,{passive:true});
+      window.addEventListener('resize',scheduleLayout,{passive:true});
       renderer.domElement.dataset.quality='ultra-hd-high-dpi';
       renderer.domElement.dataset.resolution=String(Math.round(canvas.width))+'×'+String(Math.round(canvas.height));
       renderer.domElement.dataset.renderScale=renderQuality.toFixed(2);
-      root._cleanupSolarLayout=()=>window.removeEventListener('resize',syncLayout);
+      root._cleanupSolarLayout=()=>{
+        window.removeEventListener('resize',scheduleLayout);
+        if(resizeRaf)window.cancelAnimationFrame(resizeRaf);
+      };
       updateVisibleBodies();
       webglReady=true;
       // Preserve 4K planet atlases but bound competing downloads and GPU uploads.
@@ -341,6 +351,12 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       };
       const queueIds=[INITIAL_BODY,...SOLAR_BODIES.map(body=>body.id).filter(id=>id!==INITIAL_BODY),'clouds','night'];
       let failedAtlases=0;
+      const requestTexturePaint=()=>{
+        if(texturePaintRaf||disposed||!webglReady)return;
+        texturePaintRaf=window.requestAnimationFrame(()=>{
+          texturePaintRaf=0;if(!disposed&&webglReady)renderOnce();
+        });
+      };
       textureQueue=createTextureQueue(queueIds,{
         maxConcurrent:2,delayMs:180,
         load:id=>new Promise((resolve,reject)=>{
@@ -358,7 +374,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
               else if(id==='night')applyNight(texture);
               else applyMap(id,texture);
               // Upload the texture while the cinematic loading screen is visible.
-              window.requestAnimationFrame(()=>{if(!disposed&&webglReady)renderOnce();});
+              requestTexturePaint();
               resolve();
             }catch(error){releaseAtlasTexture(texture);reject(error);}
           };
@@ -387,7 +403,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
               else window.setTimeout(cloudFallback,40);
             });
           }else if(id!=='night')await fallbackMap(id);
-          window.requestAnimationFrame(()=>{if(!disposed&&webglReady)renderOnce();});
+          requestTexturePaint();
         },
         onSettled:({completed,total})=>launchGate.progress(completed,total,failedAtlases),
         onComplete:()=>{
@@ -408,7 +424,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       // Begin heavy texture work after the first interactive 3D frame.
       textureQueue.start();
       canvas.addEventListener('webglcontextlost',event=>{
-        event.preventDefault();webglReady=false;stop();root.classList.remove('has-three');
+        event.preventDefault();webglReady=false;launchGate.close();stop();root.classList.remove('has-three');
         root.classList.add('solar-fallback');hero?.classList.remove('has-three-background');
         status.textContent='Graphics temporarily unavailable. Interactive 2D planet explorer remains available.';
       });
@@ -423,6 +439,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   start();
   return ()=>{
     disposed=true;detachRotation();launchGate.dispose();stop();textureQueue?.stop();
+    if(texturePaintRaf)window.cancelAnimationFrame(texturePaintRaf);
     observer?.disconnect();resizeObserver?.disconnect();root._cleanupSolarLayout?.();
     hero?.classList.remove('has-three-background');
     document.removeEventListener('visibilitychange',onVisibility);

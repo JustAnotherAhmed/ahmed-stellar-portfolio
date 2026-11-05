@@ -4,14 +4,14 @@
  * A slow network leaves the visitor a way to access the portfolio without waiting.
  */
 export function createLaunchGate({doc=globalThis.document,schedule=globalThis.setTimeout,
-  cancel=globalThis.clearTimeout,skipAfterMs=9000}={}){
+  cancel=globalThis.clearTimeout,skipAfterMs=9000,onReleased=()=>{}}={}){
   const root=doc?.getElementById('stellar-loader');
   const text=root?.querySelector('#stellar-loader-message');
   const meter=root?.querySelector('#stellar-loader-meter');
   const skip=root?.querySelector('#stellar-loader-skip');
   const header=doc?.querySelector?.('header'),main=doc?.getElementById?.('main');
   if(!root||!text||!meter||!skip)return {
-    open(){},progress(){},close(){},dispose(){}
+    active:false,open(){},progress(){},close(){},dispose(){}
   };
   let active=false,timeout=null,previousHeader=false,previousMain=false;
   const close=()=>{
@@ -22,8 +22,10 @@ export function createLaunchGate({doc=globalThis.document,schedule=globalThis.se
     if(main)main.inert=previousMain;
     if(timeout!==null){cancel(timeout);timeout=null;}
     skip.removeEventListener('click',close);
+    onReleased();
   };
   return {
+    get active(){return active;},
     open(total){
       if(active)return;
       active=true;

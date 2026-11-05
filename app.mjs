@@ -1,5 +1,5 @@
-import { initSolarSystem } from './solar-system.mjs';
 import { initAmbientAudio } from './ambient-audio.mjs';
+import { initSolarSystem } from './solar-system.mjs';
 
 const $ = (selector, context = document) => context.querySelector(selector);
 const $$ = (selector, context = document) => [...context.querySelectorAll(selector)];
@@ -218,7 +218,7 @@ function initDeferredQuiz(){
 /** Feature isolation: broken optional interactions must not hide résumé content. */
 for (const [name, setup] of [
   ['menu', initMenu], ['filters', initFilters], ['quick navigation', initCommandPalette],
-  ['solar system', initSolarSystem], ['ambient soundtrack', initAmbientAudio], ['knowledge arcade', initDeferredQuiz], ['web design lab', initDesignLab], ['copy email', initCopyEmail],
+  ['ambient soundtrack', initAmbientAudio], ['solar system', initSolarSystem], ['knowledge arcade', initDeferredQuiz], ['web design lab', initDesignLab], ['copy email', initCopyEmail],
 ]) {
   try { setup(); } catch (error) { console.error(`Could not initialize ${name}:`, error); }
 }

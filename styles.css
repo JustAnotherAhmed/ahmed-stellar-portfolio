@@ -660,3 +660,15 @@ body.stellar-preparing{overflow:hidden;}
   border:1px solid rgba(160,220,242,.3);border-radius:999px;padding:7px 10px;
   background:rgba(8,20,39,.84);color:#d5ecfa;font-size:10px;font-weight:650;}
 .orbit-scene.has-three.is-focused .planet-rotation-hint{display:block;}
+
+/* An accessible mobile sound activation affordance for autoplay-blocking browsers. */
+.stellar-loader__audio[hidden]{display:none!important;}
+.stellar-loader__audio{display:block;margin:18px auto 0;min-height:44px;padding:11px 19px;
+  border:1px solid rgba(126,212,236,.8);border-radius:999px;color:#e9faff;
+  background:rgba(40,105,139,.47);font-size:12px;font-weight:700;cursor:pointer;}
+.stellar-loader__audio:focus-visible{outline:3px solid #e1ffff;outline-offset:3px;}
+/* Avoid calculating expensive below-the-fold layouts at startup while the
+   3D scene and above-fold hero keep their full texture/rendering quality. */
+.section-work,.section-experience,.section-skills,.section-about,.section-game,.section-contact{
+  content-visibility:auto;contain-intrinsic-size:auto 820px;
+}
