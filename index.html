@@ -10,10 +10,12 @@
    Ahmed Osama | AI Automation &amp; IT Systems
   </title>
   <meta content="Ahmed Osama &mdash; AI automation, IT systems and web development. Explore selected work in AI-assisted workflows, Microsoft 365 security, RAG and performance-focused web development." name="description"/>
+  <link rel="canonical" href="https://ahmedosama-dev.vercel.app/"/>
+  <meta content="https://ahmedosama-dev.vercel.app/" property="og:url"/>
   <meta content="website" property="og:type"/>
   <meta content="Ahmed Osama | AI Automation &amp; IT Systems" property="og:title"/>
   <meta content="Ahmed Osama &mdash; AI automation, IT systems and web development. Explore selected work in AI-assisted workflows, Microsoft 365 security, RAG and performance-focused web development." property="og:description"/>
-  <meta content="/og-image.png" property="og:image"/>
+  <meta content="https://ahmedosama-dev.vercel.app/og-image.png" property="og:image"/>
   <meta content="summary_large_image" name="twitter:card"/>
   <link href="/favicon.svg" rel="icon" type="image/svg+xml"/>
   <link href="/styles.css" rel="stylesheet"/>
@@ -66,6 +68,16 @@
       Contact
      </a>
     </nav>
+    <div class="ambient-controls" role="group" aria-label="Original ambient space soundtrack">
+     <button class="ambient-toggle" id="ambient-toggle" type="button" aria-label="Play ambient space soundtrack" aria-pressed="false" data-playing="false" title="Orbital Drift — original ambient soundtrack (off by default)">
+      <span class="ambient-symbol" aria-hidden="true">♫</span>
+      <span class="ambient-label" data-ambient-label>Sound off</span>
+      <span class="ambient-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+     </button>
+     <label class="visually-hidden" for="ambient-volume">Ambient soundtrack volume</label>
+     <input class="ambient-volume" id="ambient-volume" type="range" min="0" max="100" value="34" step="1" aria-label="Ambient soundtrack volume"/>
+     <span class="visually-hidden" id="ambient-status" role="status" aria-live="polite">Soundtrack off by default.</span>
+    </div>
     <button aria-label="Open quick navigation, Control or Command K" class="command-trigger" id="command-trigger" type="button">
      <span aria-hidden="true" class="command-trigger__icon">
       ⌘
@@ -1125,10 +1137,9 @@
     </a>
     <p>
      Designed &amp; engineered with curiosity.
-     <span aria-hidden="true">
-      ✦
-     </span>
+     <span aria-hidden="true">✦</span>
      2026 Ahmed Osama.
+     <a class="footer-domain" href="https://ahmedosama-dev.vercel.app/">ahmedosama-dev.vercel.app</a>
     </p>
     <button class="footer-shortcut" id="footer-command" type="button">
      Quick navigation
@@ -1166,7 +1177,7 @@
   </dialog>
   <noscript>
    <div class="noscript-notice">
-    The full r&eacute;sum&eacute; and work history remain available. Enable JavaScript for the optional solar explorer, design lab and AI-powered technology quiz.
+    The full r&eacute;sum&eacute; and work history remain available. Enable JavaScript for the optional solar explorer, design lab and free technology quiz.
    </div>
   </noscript>
  </body>

@@ -86,3 +86,26 @@ view during animation, after zooming, and when the viewport is resized.
 Verification: run `node --test *.test.mjs` locally. Added regression tests
 cover the Sun, all eight planets, the Moon, desktop/mobile positioning,
 and invalid zoom values. The quiz, résumé, WhatsApp and free hosting are unchanged.
+
+
+## Official public address and optional original soundtrack
+
+The canonical portfolio URL is **https://ahmedosama-dev.vercel.app/**. This is
+an already-verified Vercel project domain. Older Vercel aliases remain live to
+avoid breaking existing links; new sharing and social preview metadata use the
+new short address. There is no paid domain registration.
+
+**Orbital Drift** is an original, algorithmically synthesized cinematic ambient
+track created with native Web Audio (`ambient-audio.mjs`). It is not a copy of,
+or an embedded file from, the U.S. Space Force website. No audio downloads,
+third-party music licenses, backend, network requests, or API keys are needed.
+
+- **Off by default.** The header's **♫ Sound off** button starts the score only
+  after a visitor clicks it (browser autoplay requirements).
+- Click again to pause, or use the labelled volume slider. The site pauses
+  playback when the browser tab is hidden and does not auto-resume unexpectedly.
+- Unsupported or blocked Web Audio shows a non-blocking error; everything else
+  on the résumé keeps working. Mobile controls remain keyboard/screen-reader
+  accessible even when the visual volume slider is hidden.
+- Run `node --test *.test.mjs`; this includes original score data, voluntary
+  playback, pause/volume behaviour, browser visibility and failure/retry tests.
