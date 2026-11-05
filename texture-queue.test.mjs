@@ -51,3 +51,25 @@ test('4K textures remain while supersampling respects a framebuffer budget',()=>
   assert.match(solar,/loadPlanetPhoto/);
   assert.match(read('planet-textures.mjs'),/prepare4kTextureAsync/);
 });
+
+test('progress reports all prepared atlases only after asynchronous fallback work completes',async()=>{
+  const settled=[],completed=[];
+  let finishFallback=null;
+  const queue=createTextureQueue(['earth','mars'],{
+    maxConcurrent:2,delayMs:1,
+    load:id=>id==='mars'?Promise.reject(Error('offline')):Promise.resolve(),
+    failed:()=>new Promise(resolve=>{finishFallback=resolve;}),
+    onSettled:e=>settled.push(e),
+    onComplete:e=>completed.push(e)
+  });
+  queue.start();await sleep(12);
+  assert.equal(settled.length,1);
+  assert.equal(completed.length,0);
+  assert.equal(typeof finishFallback,'function');
+  finishFallback();await sleep(12);
+  assert.equal(settled.length,2);
+  assert.equal(completed.length,1);
+  assert.equal(completed[0].total,2);
+  assert.equal(settled.filter(x=>!x.success).length,1);
+  queue.stop();
+});

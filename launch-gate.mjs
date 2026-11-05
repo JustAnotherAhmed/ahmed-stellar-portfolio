@@ -9,7 +9,7 @@ export function createLaunchGate({doc=globalThis.document,schedule=globalThis.se
   const text=root?.querySelector('#stellar-loader-message');
   const meter=root?.querySelector('#stellar-loader-meter');
   const skip=root?.querySelector('#stellar-loader-skip');
-  const header=doc?.querySelector('header'),main=doc?.getElementById('main');
+  const header=doc?.querySelector?.('header'),main=doc?.getElementById?.('main');
   if(!root||!text||!meter||!skip)return {
     open(){},progress(){},close(){},dispose(){}
   };
