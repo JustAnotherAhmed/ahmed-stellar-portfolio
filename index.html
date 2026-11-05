@@ -5,7 +5,7 @@
   <meta content="width=device-width, initial-scale=1" name="viewport"/>
   <meta content="dark" name="color-scheme"/>
   <meta content="#070c1d" name="theme-color"/>
-  <meta content="github-ready-static-2026-11-05" name="portfolio-release"/>
+  <meta content="interactive-refresh-2026-11-05" name="portfolio-release"/>
   <title>
    Ahmed Osama | AI Automation &amp; IT Systems
   </title>
@@ -100,7 +100,7 @@
       </span>
      </h1>
      <p class="hero-lead">
-      I turn repetitive work into intelligent workflows, connect tools that should talk to each other, and build practical systems people actually use.
+      I build smart automations and fast, thoughtful websites—connecting ideas, tools and people through practical technology.
      </p>
      <div class="hero-roles">
       <span>
@@ -556,7 +556,7 @@
        </div>
       </details>
      </article>
-     <article class="project-card" data-category="Web">
+     <article class="project-card" data-category="Web" id="web-project">
       <div class="project-card__top">
        <span class="monotext">
         MISSION 05 / WEB DEVELOPMENT
@@ -863,9 +863,18 @@
        </span>
       </div>
       <h3>
-       Development
+       Web &amp; software development
       </h3>
       <div class="skill-list">
+       <span>
+        Frontend development
+       </span>
+       <span>
+        Responsive websites
+       </span>
+       <span>
+        Performance optimization
+       </span>
        <span>
         Python
        </span>
@@ -920,6 +929,34 @@
       </div>
      </article>
     </div>
+   <div class="web-lab" id="web-lab">
+    <div class="web-lab__intro">
+     <p class="section-kicker">INTERACTIVE / WEB DESIGN LAB</p>
+     <h3>Websites are part of my craft.</h3>
+     <p>I enjoy turning an idea into a responsive, purposeful website—not just writing code, but thinking about speed, clarity and the details people notice. At Webology, my frontend rebuild improved page-load performance by 30%.</p>
+     <a class="web-lab__link" href="#web-project">Explore my web development mission &nearr;</a>
+     <p class="web-lab__note">Try the live design controls. This is a small demo, not a client project.</p>
+    </div>
+    <div class="web-lab__workspace" id="design-lab">
+     <div class="web-lab__toolbar">
+      <span class="monotext">UI PLAYGROUND / LIVE PREVIEW</span>
+      <div class="design-lab__controls" role="group" aria-label="Preview theme">
+       <button type="button" class="lab-control is-active" data-lab-theme="orbit" aria-pressed="true">Orbit</button>
+       <button type="button" class="lab-control" data-lab-theme="nova" aria-pressed="false">Nova</button>
+      </div>
+      <div class="design-lab__controls" role="group" aria-label="Preview layout">
+       <button type="button" class="lab-control is-active" data-lab-layout="grid" aria-pressed="true">Grid</button>
+       <button type="button" class="lab-control" data-lab-layout="stack" aria-pressed="false">Stack</button>
+      </div>
+     </div>
+     <div class="lab-preview" id="lab-preview" data-theme="orbit" data-layout="grid" aria-label="Live website design preview">
+      <div class="lab-preview__nav"><strong>nova<span>.</span>studio</strong><span>Work&nbsp;&nbsp; About&nbsp;&nbsp; Contact</span></div>
+      <div class="lab-preview__hero"><p>AN IDEA, BEAUTIFULLY BUILT</p><h4>Thoughtful design.<br/>Fast experiences.</h4><span>A little prototype for the curious.</span></div>
+      <div class="lab-preview__cards"><div><span>01</span><strong>Purposeful</strong><small>Clear hierarchy</small></div><div><span>02</span><strong>Responsive</strong><small>Built for every screen</small></div><div><span>03</span><strong>Considered</strong><small>Details that matter</small></div></div>
+     </div>
+     <p class="lab-status" id="lab-status" aria-live="polite">Orbit theme · Grid layout</p>
+    </div>
+   </div>
    </section>
    <section aria-labelledby="about-title" class="section section-about" id="about">
     <div class="container about-layout">
@@ -934,10 +971,10 @@
        </em>
       </h2>
       <p>
-       My background spans artificial intelligence, IT support, web development, and cross-functional problem solving. I enjoy turning a messy process into something clear, reliable, and useful.
+       My background spans artificial intelligence, IT support, and web development. I genuinely enjoy building websites: shaping the interface, making it responsive, and refining the experience until it feels effortless to use.
       </p>
       <p>
-       From building an internal knowledge assistant to training teams on AI, my focus stays the same: make technology work better for people.
+       From a frontend rebuild that improved page-load performance by 30% to internal AI assistants and team training, my focus stays the same: technology that feels useful and intuitive.
       </p>
       <div class="languages">
        <span>
@@ -1020,87 +1057,35 @@
    <section aria-labelledby="signal-title" class="section container section-game" id="signal">
     <div class="game-shell">
      <div class="game-copy">
-      <p class="section-kicker">
-       BONUS / OPTIONAL SIDE QUEST
-      </p>
-      <h2 id="signal-title">
-       A little room for
-       <em>
-        play.
-       </em>
-      </h2>
-      <p>
-       Need a 30-second detour? Decode three cosmic signals and collect the Explorer achievement. Entirely optional&mdash;no recruiter information is locked.
-      </p>
-      <div aria-live="polite" class="game-prize" id="achievement-indicator">
-       <span aria-hidden="true">
-        ✦
-       </span>
-       <span>
-        Explorer achievement
-        <b>
-         not yet unlocked
-        </b>
-       </span>
-      </div>
+      <p class="section-kicker">BONUS / OPTIONAL SIDE QUEST</p>
+      <h2 id="signal-title">The AI <em>knowledge gauntlet.</em></h2>
+      <p>How well do you know artificial intelligence? Eight multiple-choice questions, four escalating levels: Easy, Intermediate, Hard and Extreme. No typing, no timer, no locked résumé content.</p>
+      <div class="quiz-level-list" aria-label="Quiz difficulty levels"><span>01 Easy</span><span>02 Intermediate</span><span>03 Hard</span><span>04 Extreme</span></div>
+      <div aria-live="polite" class="game-prize" id="achievement-indicator"><span aria-hidden="true">✦</span><span>AI Explorer achievement <b>not yet unlocked</b></span></div>
      </div>
      <div class="game-console" id="signal-game">
-      <div class="game-console__header">
-       <span>
-        <i aria-hidden="true">
-        </i>
-        SIGNAL DECODER / v1.0
-       </span>
-       <span>
-        ◉ ◉ ◉
-       </span>
-      </div>
+      <div class="game-console__header"><span><i aria-hidden="true"></i> AI KNOWLEDGE / v2.0</span><span>◉ ◉ ◉ ◉</span></div>
       <div class="game-idle" id="game-idle">
-       <div aria-hidden="true" class="signal-emblem">
-        ◎
-       </div>
-       <p>
-        Incoming transmission detected.
-       </p>
-       <button class="btn btn-primary game-start" id="game-start" type="button">
-        Start side quest
-        <span aria-hidden="true">
-         &rarr;
-        </span>
-       </button>
+       <div aria-hidden="true" class="signal-emblem">✧</div>
+       <p>Ready to test your AI knowledge?</p>
+       <button class="btn btn-primary game-start" id="game-start" type="button">Start AI quiz <span aria-hidden="true">&rarr;</span></button>
       </div>
-      <div class="game-active" hidden="" id="game-active">
-       <div class="game-progress" id="game-progress">
-        TRANSMISSION 1 / 3
-       </div>
-       <h3 id="game-question" tabindex="-1">
-       </h3>
-       <div aria-label="Choose a signal answer" class="game-options" id="game-options" role="group">
-       </div>
-       <p aria-live="polite" class="game-feedback" id="game-feedback" role="status">
-       </p>
+      <div class="game-active" hidden id="game-active">
+       <div class="game-progress" id="game-progress">EASY · QUESTION 1 / 8</div>
+       <div class="quiz-level-track" id="quiz-level-track" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+       <h3 id="game-question" tabindex="-1"></h3>
+       <div aria-label="Choose one answer" class="game-options" id="game-options" role="group"></div>
+       <p aria-live="polite" class="game-feedback" id="game-feedback" role="status"></p>
        <div class="game-controls">
-        <button class="btn btn-secondary game-next" hidden="" id="game-next" type="button">
-         Next transmission &rarr;
-        </button>
-        <button class="game-exit" id="game-exit" type="button">
-         Exit game
-        </button>
+        <button class="btn btn-secondary game-next" hidden id="game-next" type="button">Next question &rarr;</button>
+        <button class="game-exit" id="game-exit" type="button">Exit quiz</button>
        </div>
       </div>
-      <div class="game-complete" hidden="" id="game-complete">
-       <span aria-hidden="true" class="complete-icon">
-        ✧
-       </span>
-       <h3>
-        Achievement unlocked.
-       </h3>
-       <p>
-        Signal Decoder / Explorer class. Thanks for exploring this corner of the universe.
-       </p>
-       <button class="btn btn-secondary" id="game-restart" type="button">
-        Play again &orarr;
-       </button>
+      <div class="game-complete" hidden id="game-complete">
+       <span aria-hidden="true" class="complete-icon">✦</span>
+       <h3>Mission complete.</h3>
+       <p id="game-result" aria-live="polite">Your score is ready.</p>
+       <button class="btn btn-secondary" id="game-restart" type="button">Try again &orarr;</button>
       </div>
      </div>
     </div>
@@ -1120,8 +1105,8 @@
       I'm always interested in conversations about automation, AI-enabled workflows, practical software, and teams building useful things.
      </p>
      <div class="contact-actions">
-      <a class="btn btn-primary" href="mailto:F.ahmed30@yahoo.com?subject=Hello%20Ahmed%20%E2%80%94%20Portfolio%20Inquiry">
-       Send a message
+      <a class="btn btn-primary" href="https://wa.me/971521133465?text=Hello%20Ahmed%2C%20I%20found%20your%20portfolio%20and%20would%20like%20to%20connect." target="_blank" rel="noopener noreferrer" aria-label="Send a message to Ahmed on WhatsApp (opens in a new tab)">
+       Message on WhatsApp
        <span aria-hidden="true">
         &nearrow;
        </span>
@@ -1203,7 +1188,7 @@
   </dialog>
   <noscript>
    <div class="noscript-notice">
-    The full r&eacute;sum&eacute; and work history remain available. Enable JavaScript for filters, quick navigation, and the optional signal game.
+    The full r&eacute;sum&eacute; and work history remain available. Enable JavaScript for filters, quick navigation, the design lab, and the optional AI quiz.
    </div>
   </noscript>
  </body>
