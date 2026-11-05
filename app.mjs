@@ -1,5 +1,6 @@
 import { initSolarSystem } from './solar-system.mjs';
 import { initGeneralQuiz } from './quiz-ui.mjs';
+import { initAmbientAudio } from './ambient-audio.mjs';
 
 const $ = (selector, context = document) => context.querySelector(selector);
 const $$ = (selector, context = document) => [...context.querySelectorAll(selector)];
@@ -182,7 +183,7 @@ function initCopyEmail() {
 /** Feature isolation: broken optional interactions must not hide résumé content. */
 for (const [name, setup] of [
   ['menu', initMenu], ['filters', initFilters], ['quick navigation', initCommandPalette],
-  ['solar system', initSolarSystem], ['knowledge arcade', initGeneralQuiz], ['web design lab', initDesignLab], ['copy email', initCopyEmail],
+  ['solar system', initSolarSystem], ['ambient soundtrack', initAmbientAudio], ['knowledge arcade', initGeneralQuiz], ['web design lab', initDesignLab], ['copy email', initCopyEmail],
 ]) {
   try { setup(); } catch (error) { console.error(`Could not initialize ${name}:`, error); }
 }

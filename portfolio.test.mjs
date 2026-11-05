@@ -58,3 +58,15 @@ test('Vercel deploys static root without any backend or build command',()=>{
   assert.ok(!cfg.buildCommand);assert.ok(!cfg.functions);
   assert.match(read('solar-system.mjs'),/three@0\.187\.0/);
 });
+
+test('short Vercel domain is canonical and optional original music is accessible',()=>{
+  const html=read('index.html');
+  assert.match(html,/<link rel="canonical" href="https:\/\/ahmedosama-dev\.vercel\.app\/"\/>/);
+  assert.match(html,/property="og:url"/);
+  for(const id of ['ambient-toggle','ambient-volume','ambient-status'])assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(html,/aria-pressed="false"/);
+  assert.match(html,/value="34"/);
+  assert.doesNotMatch(html,/<audio[^>]+autoplay|\bautoplay\b/);
+  assert.ok(exists('ambient-audio.mjs'));
+  assert.match(read('app.mjs'),/initAmbientAudio/);
+});
