@@ -74,3 +74,15 @@ The Three.js canvas now fills the entire hero background instead of a fixed 440�
 **Optional planet photo-map credit:** [Solar System Scope](https://www.solarsystemscope.com/textures/) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). These visual maps use NASA mission data, and may have color adjustments or inferred terrain. Credit also appears in the live planet panel. Image requests occur only on selection, and the generated textures remain a no-network fallback. No API keys or paid services are needed.
 
 The source stays vanilla JS and no-build Vercel. Run `node --test *.test.mjs` and `python smoke_browser.py` to verify the added layout, moon framing, image error fallback and the unchanged offline quiz behavior.
+
+## Focus-camera regression fix (November 2026)
+
+The WebGL renderer spans the full hero, while its orbital world is translated
+to a right-hand explorer stage. An orthographic zoom magnifies that translation.
+The focus camera now compensates for the world anchor at every frame using
+`anchoredCameraOffset` in `render-quality.mjs`, keeping the selected planet in
+view during animation, after zooming, and when the viewport is resized.
+
+Verification: run `node --test *.test.mjs` locally. Added regression tests
+cover the Sun, all eight planets, the Moon, desktop/mobile positioning,
+and invalid zoom values. The quiz, résumé, WhatsApp and free hosting are unchanged.
