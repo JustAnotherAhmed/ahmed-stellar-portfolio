@@ -125,3 +125,13 @@ external audio assets, or licensed recordings are needed.
 The hero and About sections explicitly show the breadth of technical roles
 being pursued: AI engineering, automation, web development, IT support and
 closely related work. Run `node --test *.test.mjs` to check regressions.
+
+## Performance optimization (v8)
+
+- The offline technology quiz now loads its curated question bank only when a visitor approaches the quiz section, instead of during the homepage's initial render.
+- The first Three.js frame appears with simple colored planet materials; detailed procedural planet surfaces and Earth's clouds are added in separate idle tasks. Photographic 2K planet textures still load for selected close-ups when available.
+- Planet HTML controls update at 24 Hz separately from WebGL's frame rendering, and their layout scale is calculated on resize rather than for every frame.
+- WebGL adapts its frame budget: up to 60 FPS on desktop, 45 FPS on tablets and 30 FPS on small/low-memory devices. Actual frame rates vary with hardware.
+- Preconnect to the existing Three.js CDN to reduce connection setup latency when external Three.js loads.
+- No paid services, build tooling, or changes to the score, audio preference, accessibility, or orbital camera framing.
+- Validate with `node --test *.test.mjs`. No specific Core Web Vitals or percentage gains are claimed without real-user measurement.
