@@ -108,7 +108,7 @@ export function makeRingTexture(THREE,id,width=4096){
   t.anisotropy=16;t.generateMipmaps=true;
   return t;
 }
-export function addRings(THREE,mesh,id){
+export function addRings(THREE,mesh,id,{width=4096}={}){
   const specifications={
     jupiter:{inner:1.32,outer:1.48,opacity:.19,tilt:.63},
     saturn:{inner:1.18,outer:2.18,opacity:.87,tilt:.48},
@@ -124,7 +124,7 @@ export function addRings(THREE,mesh,id){
   }
   uv.needsUpdate=true;
   const rings=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({
-    map:makeRingTexture(THREE,id),side:THREE.DoubleSide,transparent:true,
+    map:makeRingTexture(THREE,id,width),side:THREE.DoubleSide,transparent:true,
     opacity:config.opacity,alphaTest:.035,roughness:1,metalness:0,depthWrite:false
   }));
   rings.rotation.x=config.tilt;rings.rotation.y=.18;mesh.add(rings);

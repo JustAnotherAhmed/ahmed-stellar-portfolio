@@ -283,7 +283,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
           mesh.add(createAtmosphere(THREE,body.glow,body.id==='sun'?.45:.5));
         }
         // Earth clouds also render later as an idle texture task.
-        addRings(THREE,mesh,body.id);
+        addRings(THREE,mesh,body.id,{width:profile.mobile?1024:4096});
       }
       const coords=[],starGeometry=new THREE.BufferGeometry();
       for(let i=0;i<480;i++){
@@ -510,7 +510,11 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       // Begin heavy texture work after the first interactive 3D frame.
       textureQueue.start();
       canvas.addEventListener('webglcontextlost',event=>{
-        event.preventDefault();webglReady=false;launchGate.close();stop();root.classList.remove('has-three');
+        event.preventDefault();
+        // Remember lost mobile graphics state for this tab. The next page
+        // load enters the safe 2D explorer instead of repeating a GPU crash.
+        if(profile.mobile)try{window.sessionStorage?.setItem(bootKey,'pending');}catch{}
+        webglReady=false;launchGate.close();stop();root.classList.remove('has-three');
         root.classList.add('solar-fallback');hero?.classList.remove('has-three-background');
         status.textContent='Graphics temporarily unavailable. Interactive 2D planet explorer remains available.';
       });
