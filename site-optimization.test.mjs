@@ -10,9 +10,9 @@ test('audio preference and mobile unlock are initialized before solar GPU work',
 });
 test('fully detailed 4K solar scene is still staged without a hidden perpetual render loop',()=>{
  const solar=read('solar-system.mjs'),gate=read('launch-gate.mjs');
- assert.match(solar,/cinematicPixelRatio\(/);
- assert.match(solar,/maxConcurrent:2,delayMs:180/);
- assert.match(solar,/createSurfaceTexture\(THREE,id,\{width:4096\}\)/);
+ assert.match(solar,/adaptivePixelRatio\(/);
+ assert.match(solar,/maxConcurrent:profile\.mapConcurrency,delayMs:profile\.mobile\?80:180/);
+ assert.match(solar,/createSurfaceTexture\(THREE,id,\{width:profile\.textureWidth\}\)/);
  assert.match(solar,/launchGate\.active/);
  assert.match(gate,/get active\(\)/);
  assert.match(gate,/onReleased\(\)/);
