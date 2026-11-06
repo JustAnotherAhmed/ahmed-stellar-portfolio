@@ -201,6 +201,9 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
   const loaderAudioButton=doc?.getElementById('stellar-audio-start');
   if(!button || !slider || !status) return ()=>{};
   const view=doc.defaultView;
+  // Creating an AudioContext before a touch leaves iOS/WebKit in a suspended
+  // state. On coarse-pointer phones, construct it inside the first gesture.
+  const mobileGestureRequired=Boolean(view?.matchMedia?.('(pointer: coarse)')?.matches);
   let store=storage;
   if(store===undefined){try{store=view?.localStorage;}catch{store=null;}}
   let enabled=readSoundPreference(store);
@@ -214,7 +217,10 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
     button.setAttribute('aria-label',enabled?(playing?'Turn website sounds off':'Start website soundtrack'):'Turn website sounds on');
     const label=button.querySelector('[data-ambient-label]');
     if(label)label.textContent=enabled?(playing?'Sound on':'Play sound'):'Sound off';
-    if(loaderAudioButton)loaderAudioButton.hidden=!enabled||playing||doc.hidden;
+    if(loaderAudioButton){
+      loaderAudioButton.hidden=playing||doc.hidden;
+      loaderAudioButton.textContent=enabled?'♫ Tap to start soundtrack':'♫ Enable soundtrack';
+    }
     if(message)status.textContent=message;
   }
   async function pause(reason='Sound paused.'){
@@ -224,7 +230,7 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
     try{await engine.pause();}
     catch(error){console.warn('Could not pause site audio:',error);}
   }
-  function start(cue=null){
+  function start(cue=null,fromGesture=false){
     if(disposed || !enabled || doc.hidden)return Promise.resolve(false);
     if(playing){
       if(cue)try{engine?.playEffect?.(cue);}catch(error){console.warn('Click sound failed:',error);}
@@ -239,6 +245,9 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
       try{
         if(!engine)engine=engineFactory();
         engine.setVolume(slider.value);
+        // This synchronous call happens before the first awaited promise,
+        // preserving Safari/Chrome user activation for the AudioContext.
+        if(fromGesture)engine.unlock?.();
         await engine.play();
         if(disposed || !enabled || doc.hidden){await engine.pause();return false;}
         playing=true;everStarted=true;
@@ -261,7 +270,7 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
     if(event?.target?.closest?.('#ambient-toggle, #ambient-volume'))return;
     if(starting){
       try{engine?.unlock?.();}catch(error){console.warn('Audio unlock failed:',error);}
-    }else void start();
+    }else void start(null,true);
   }
   function onToggle(){
     if(disposed)return;
@@ -270,18 +279,22 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
       // not silently switch the site's default-on preference OFF.
       paint('Starting the soundtrack from your tap…');
       if(starting){try{engine?.unlock?.();}catch(error){console.warn('Sound unlock failed:',error);}}
-      else void start('ui');
+      else void start('ui',true);
       return;
     }
     enabled=!enabled;
     saveSoundPreference(store,enabled);
     if(!enabled){void pause('Website sounds muted. They will stay muted until you turn them on.');}
-    else{paint('Sound enabled. Starting Orbital Drift.');void start('ui');}
+    else{paint('Sound enabled. Starting Orbital Drift.');void start('ui',true);}
   }
   function onLoaderAudioStart(){
-    if(disposed||!enabled)return;
+    if(disposed)return;
+    if(!enabled){
+      enabled=true;
+      saveSoundPreference(store,true);
+    }
     if(starting){try{engine?.unlock?.();}catch(error){console.warn('Sound unlock failed:',error);}}
-    else void start('ui');
+    else void start('ui',true);
     paint('Starting the soundtrack from your tap…');
   }
   function onVolume(){try{engine?.setVolume(slider.value);}catch(error){console.warn('Volume unavailable:',error);}}
@@ -295,7 +308,7 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
     const interactive=target.closest('button, a, summary, select, input, [role="button"], [role="option"]');
     // The first click anywhere also unlocks sound, even on non-control elements.
     if(!planet && !interactive && playing)return;
-    void start(planet || (interactive?'ui':null));
+    void start(planet || (interactive?'ui':null),true);
   }
   function onKeydown(event){
     if(!enabled || playing || disposed || doc.hidden || event.repeat)return;
@@ -305,7 +318,7 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
   function onVisibility(){
     if(doc.hidden){void pause('Website sounds paused while the tab is hidden.');}
     else if(enabled && everStarted){void start();}
-    else if(enabled)paint('Sound on — click anywhere to start listening.');
+    else if(enabled)paint('Sound enabled — touch or tap to start the soundtrack.');
   }
   function onPageHide(){void pause('Sound paused while the page is away.');}
   function onPageShow(){if(enabled && everStarted && !doc.hidden)void start();}
@@ -323,9 +336,9 @@ export function initAmbientAudio({doc=globalThis.document,engineFactory=createAm
   view?.addEventListener?.('pagehide',onPageHide);
   view?.addEventListener?.('pageshow',onPageShow);
   paint(enabled ? 'Sound on — plays immediately when allowed, otherwise at the first touch, scroll, click or keypress.' : 'Website sounds muted by your preference.');
-  // Attempt autoplay regardless of getAutoplayPolicy support. Browsers may
-  // suspend the AudioContext; the next genuine gesture releases it.
-  if(enabled && !doc.hidden)void start();
+  // Desktop may allow autoplay. On iOS/Android, do not create a suspended
+  // AudioContext before the user's first genuine gesture.
+  if(enabled && !doc.hidden && !mobileGestureRequired)void start();
   return ()=>{
     if(disposed)return;
     disposed=true;
