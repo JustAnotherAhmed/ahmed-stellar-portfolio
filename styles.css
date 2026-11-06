@@ -672,3 +672,16 @@ body.stellar-preparing{overflow:hidden;}
 .section-work,.section-experience,.section-skills,.section-about,.section-game,.section-contact{
   content-visibility:auto;contain-intrinsic-size:auto 820px;
 }
+
+/* Loading percentage is tied to completed initial WebGL assets, not an animated fake timer. */
+.stellar-loader__percent{display:block;font-size:clamp(21px,6vw,30px);font-weight:800;
+  letter-spacing:.035em;color:#e4fcff;font-variant-numeric:tabular-nums;
+  margin:0 0 10px;}
+@media(max-width:760px){
+  .stellar-loader{padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));}
+  .stellar-loader__panel{padding:26px 20px;max-height:calc(100dvh - 28px);overflow-y:auto;}
+  .stellar-loader h2{font-size:clamp(23px,6vw,31px);}
+  .stellar-loader__hint{line-height:1.5;}
+  .planet-rotation-pad{touch-action:none;}
+}
+html,body{max-width:100%;overflow-x:clip;}
