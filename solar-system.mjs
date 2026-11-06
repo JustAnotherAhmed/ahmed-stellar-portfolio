@@ -1,7 +1,8 @@
 import {SOLAR_BODIES,ORBITAL_BODIES,BODY_BY_ID,INITIAL_BODY,positionsAt} from './planets.mjs';
 import {CAMERA_OVERVIEW,FOCUS_DURATION_MS,focusZoomFor,sampleCamera,transitionCamera} from './camera-focus.mjs';
 import {createSurfaceTexture,createAtmosphere,addRings,addEarthClouds,loadPlanetPhoto,loadCloudImage,loadNightLights,addEarthNightLights,releaseAtlasTexture} from './planet-textures.mjs';
-import {sceneAnchoring,satelliteSafeZoom,anchoredCameraOffset,cinematicPixelRatio} from './render-quality.mjs';
+import {sceneAnchoring,satelliteSafeZoom,anchoredCameraOffset} from './render-quality.mjs';
+import {selectDeviceProfile,adaptivePixelRatio} from './device-profile.mjs';
 import {MARKER_INTERVAL_MS,dueForUpdate} from './performance.mjs';
 import {createTextureQueue} from './texture-queue.mjs';
 import {createLaunchGate} from './launch-gate.mjs';
@@ -22,8 +23,25 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   const fallback=$('#solar-closeup'),fallbackName=$('#solar-closeup-name');
   if(!canvas||!svg||!stage||!markers||!picker||!returnButton)return ()=>{};
   const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
-  const launchGate=createLaunchGate({doc:document,onReleased:()=>start()});
-  if(!reduced.matches && window.WebGL2RenderingContext)launchGate.open(SOLAR_BODIES.length+2);
+  const profile=selectDeviceProfile({
+    width:window.innerWidth,coarse:window.matchMedia('(pointer: coarse)').matches,
+    memory:window.navigator?.deviceMemory,saveData:window.navigator?.connection?.saveData
+  });
+  // If the previous visit died during the high-memory 3D startup, keep this
+  // session in safe 2D mode instead of repeatedly crashing on reload.
+  const bootKey='stellar-webgl-initializing';
+  let recoveredFromCrash=false;
+  if(profile.mobile){
+    try{
+      recoveredFromCrash=window.sessionStorage?.getItem(bootKey)==='pending';
+      if(!recoveredFromCrash)window.sessionStorage?.setItem(bootKey,'pending');
+    }catch{}
+  }
+  const releaseBootMarker=()=>{try{window.sessionStorage?.removeItem(bootKey);}catch{}};
+  const use2D=reduced.matches||profile.force2D||recoveredFromCrash;
+  const launchGate=createLaunchGate({doc:document,onReleased:()=>{releaseBootMarker();start();},
+    skipAfterMs:profile.mobile?4000:8000,autoReleaseAfterMs:profile.mobile?8500:18000});
+  if(!use2D&&window.WebGL2RenderingContext)launchGate.open(profile.mobile?profile.initialIds.length:SOLAR_BODIES.length+2);
   const motion={enabled:!reduced.matches,visible:!document.hidden,intersecting:true};
   const NS='http://www.w3.org/2000/svg';
   let raf=0,last=0,elapsed=60,scene=null,camera=null,renderer=null,stars=null,webglReady=false;
@@ -34,6 +52,8 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   const meshes=new Map(),markerMap=new Map(),pickerMap=new Map();
   let disposed=false,renderQuality=1,markerScale=1,lastMarkersAt=0,frameInterval=1000/60;
   let textureQueue=null,draggingPlanet=false,parallaxBounds=null,texturePaintRaf=0;
+  let promoteFocusedTexture=()=>{};
+  let releaseFocusTexture=()=>{};
   const positions=()=>positionsAt(elapsed);
   markerScale=Math.max(.01,stage.getBoundingClientRect().width/440);
   function closeupZoom(body){
@@ -86,7 +106,9 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
     transition=transitionCamera(cameraState,to,performance.now(),reduced.matches?1:FOCUS_DURATION_MS);
     updateVisibleBodies();
     textureQueue?.prioritize(nextId);
-    // Every world begins its 4K atlas request when WebGL initializes.
+    if(nextId)promoteFocusedTexture(nextId);
+    else releaseFocusTexture();
+    // Desktop prepares 4K maps; mobile starts with safe atlas sizes.
     if(reduced.matches){cameraState={...to};transition=null;renderOnce();}
     else start();
   }
@@ -200,7 +222,11 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   function stop(){if(raf)cancelAnimationFrame(raf);raf=0;last=0;}
   function start(){if(disposed||launchGate.active||!motion.visible||!motion.intersecting||!motion.enabled)return;if(!raf)raf=requestAnimationFrame(tick);}
   function renderOnce(){paint(performance.now(),0);}
-  const onVisibility=()=>{motion.visible=!document.hidden;if(motion.visible)start();else stop();};
+  const onVisibility=()=>{
+    motion.visible=!document.hidden;
+    if(motion.visible){textureQueue?.resume?.();start();}
+    else{textureQueue?.pause?.();stop();}
+  };
   const onMotion=()=>{motion.enabled=!reduced.matches;if(motion.enabled)start();else{stop();renderOnce();}};
   document.addEventListener('visibilitychange',onVisibility);
   reduced.addEventListener?.('change',onMotion);
@@ -224,14 +250,16 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
   async function initializeThree(){
     try{
       if(!window.WebGL2RenderingContext)throw Error('WebGL2 is not available');
-      const gl=canvas.getContext('webgl2',{alpha:true,antialias:true,powerPreference:'high-performance'});
+      const gl=canvas.getContext('webgl2',{alpha:true,antialias:true,powerPreference:profile.mobile?'low-power':'high-performance'});
       if(!gl)throw Error('WebGL context initialization failed');
+      if(gl.getParameter(gl.MAX_TEXTURE_SIZE)<2048)throw Error('GPU has insufficient texture capacity');
       const THREE=await import('https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js');
       if(disposed||!canvas.isConnected){launchGate.close();return;}
       threeModule=THREE;
       scene=new THREE.Scene();
       camera=new THREE.OrthographicCamera(-220,220,220,-220,1,1800);
-      renderer=new THREE.WebGLRenderer({canvas,context:gl,alpha:true,antialias:true,powerPreference:'high-performance'});
+      renderer=new THREE.WebGLRenderer({canvas,context:gl,alpha:true,antialias:!profile.constrained,
+        powerPreference:profile.mobile?'low-power':'high-performance'});
       renderer.outputColorSpace=THREE.SRGBColorSpace;
       renderer.toneMapping=THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure=1.25;
@@ -240,7 +268,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       const sunlight=new THREE.PointLight(0xffe2b6,88,0,0);
       sunlight.position.set(0,0,48);world.add(sunlight);
       // Reuse one detailed sphere geometry; upload color placeholders first.
-      const geometry=new THREE.SphereGeometry(1,192,144);
+      const geometry=new THREE.SphereGeometry(1,profile.mobile?96:192,profile.mobile?72:144);
       for(const body of SOLAR_BODIES){
         const texture=null; // First paint is immediate; idle tasks supply detailed textures.
         const material=body.id==='sun'
@@ -274,7 +302,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         const frame=sceneAnchoring(canvasRect,stageRect);
         worldScale=frame.scale;
         markerScale=frame.scale;
-        frameInterval=1000/60; // Ultra-HD prioritizes a 60 Hz render target;
+        frameInterval=1000/profile.frameRate; // Stable 30Hz phones / 60Hz desktop.
         world.scale.setScalar(worldScale);
         world.position.set(frame.x,frame.y,0);
         const city=meshes.get('earth')?.children.find(o=>o.name==='Earth city lights');
@@ -282,8 +310,10 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         const w=Math.max(1,Math.round(canvasRect.width)),h=Math.max(1,Math.round(canvasRect.height));
         camera.left=-w/2;camera.right=w/2;camera.top=h/2;camera.bottom=-h/2;
         camera.updateProjectionMatrix();
-        // Full v9 ultra-HD pixel density from the first frame, bounded only by hardware.
-        renderQuality=cinematicPixelRatio(w,h,window.devicePixelRatio||1,gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
+        // Mobile framebuffers have a strict memory budget. 4K desktop atlases
+        // remain unchanged and independent from the screen's render scale.
+        renderQuality=adaptivePixelRatio(w,h,window.devicePixelRatio||1,
+          gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),profile);
         renderer.setPixelRatio(renderQuality);
         renderer.setSize(w,h,false);
         positionDom(elapsed);
@@ -298,7 +328,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       resizeObserver=typeof ResizeObserver==='undefined'?null:new ResizeObserver(scheduleLayout);
       resizeObserver?.observe(hero);resizeObserver?.observe(stage);
       window.addEventListener('resize',scheduleLayout,{passive:true});
-      renderer.domElement.dataset.quality='ultra-hd-high-dpi';
+      renderer.domElement.dataset.quality=profile.mobile?'mobile-adaptive':'ultra-hd-desktop';
       renderer.domElement.dataset.resolution=String(Math.round(canvas.width))+'×'+String(Math.round(canvas.height));
       renderer.domElement.dataset.renderScale=renderQuality.toFixed(2);
       root._cleanupSolarLayout=()=>{
@@ -307,11 +337,33 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       };
       updateVisibleBodies();
       webglReady=true;
-      // Preserve 4K planet atlases but bound competing downloads and GPU uploads.
+      // Desktop uses 4K maps; mobile holds lightweight overview maps plus
+      // at most one focused 2K map in GPU memory.
+      let focusedDetail=null,detailRequest=0;
+      const releaseDetail=()=>{
+        detailRequest++;
+        if(!focusedDetail)return;
+        const {id,baseMap,detailMap}=focusedDetail;
+        const target=meshes.get(id);
+        if(target?.material){
+          target.material.map=baseMap;
+          if(target.material.bumpMap===detailMap)target.material.bumpMap=baseMap;
+          target.material.needsUpdate=true;
+        }
+        releaseAtlasTexture(detailMap);
+        focusedDetail=null;
+      };
+      releaseFocusTexture=releaseDetail;
       const applyMap=(id,highRes)=>{
         const target=meshes.get(id);
         if(!highRes)return;
         if(disposed||!webglReady||!target?.parent){releaseAtlasTexture(highRes);return;}
+        if(focusedDetail?.id===id){
+          // Keep the focused planet detailed while updating its base map.
+          releaseAtlasTexture(focusedDetail.baseMap);
+          focusedDetail.baseMap=highRes;
+          return;
+        }
         const old=target.material.map;
         target.material.map=highRes;
         target.material.color.set('#ffffff');
@@ -325,11 +377,31 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         if(old&&old!==highRes)releaseAtlasTexture(old);
         // The next animation frame performs the upload; no forced extra render.
       };
+      promoteFocusedTexture=id=>{
+        if(!profile.mobile||profile.constrained||!webglReady||!meshes.has(id))return;
+        if(focusedDetail?.id===id)return;
+        releaseDetail();
+        const token=detailRequest;
+        loadPlanetPhoto(THREE,id,texture=>{
+          if(disposed||!webglReady||token!==detailRequest||focusedId!==id){
+            releaseAtlasTexture(texture);return;
+          }
+          const target=meshes.get(id);
+          if(!target?.material){releaseAtlasTexture(texture);return;}
+          const baseMap=target.material.map;
+          focusedDetail={id,baseMap,detailMap:texture};
+          target.material.map=texture;
+          if(['moon','mercury','mars'].includes(id))target.material.bumpMap=texture;
+          target.material.needsUpdate=true;
+          requestTexturePaint();
+        },error=>console.warn('Focused detail unavailable:',id,error),
+        {width:profile.focusTextureWidth,small:true});
+      };
       const fallbackMap=id=>new Promise(resolve=>{
         if(disposed||!webglReady){resolve();return;}
         const work=()=>{
           try{
-            if(!disposed&&webglReady)applyMap(id,createSurfaceTexture(THREE,id,{width:4096}));
+            if(!disposed&&webglReady)applyMap(id,createSurfaceTexture(THREE,id,{width:profile.textureWidth}));
           }catch(error){console.warn('Retaining color-only planet material:',id,error);}
           finally{resolve();}
         };
@@ -339,7 +411,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
       const earth=meshes.get('earth');
       const applyClouds=texture=>{
         if(disposed||!webglReady){releaseAtlasTexture(texture);return;}
-        try{addEarthClouds(THREE,earth,{texture,width:4096,alphaMap:true});}
+        try{addEarthClouds(THREE,earth,{texture,width:profile.textureWidth,alphaMap:true});}
         catch(error){releaseAtlasTexture(texture);console.warn('Earth cloud layer unavailable:',error);}
       };
       const applyNight=texture=>{
@@ -349,7 +421,11 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
           lights.material.uniforms.sunWorldPosition.value.set(world.position.x,world.position.y,world.position.z+48*worldScale);
         }catch(error){releaseAtlasTexture(texture);console.warn('City-light layer unavailable:',error);}
       };
-      const queueIds=[INITIAL_BODY,...SOLAR_BODIES.map(body=>body.id).filter(id=>id!==INITIAL_BODY),'clouds','night'];
+      const essentialIds=profile.mobile?profile.initialIds:[
+        INITIAL_BODY,...SOLAR_BODIES.map(body=>body.id).filter(id=>id!==INITIAL_BODY),'clouds','night'];
+      const queueIds=[...new Set([...essentialIds,...SOLAR_BODIES.map(body=>body.id),'clouds','night'])];
+      const essentialSet=new Set(essentialIds);
+      let essentialsReady=0;
       let failedAtlases=0;
       const requestTexturePaint=()=>{
         if(texturePaintRaf||disposed||!webglReady)return;
@@ -358,14 +434,14 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         });
       };
       textureQueue=createTextureQueue(queueIds,{
-        maxConcurrent:2,delayMs:180,
+        maxConcurrent:profile.mapConcurrency,delayMs:profile.mobile?80:180,
         load:id=>new Promise((resolve,reject)=>{
           let settled=false;
           // An inaccessible image host must not trap the loading screen forever.
           const timeout=window.setTimeout(()=>{
             if(settled)return;
             settled=true;reject(new Error('Atlas download timed out: '+id));
-          },16000);
+          },profile.mobile?9000:16000);
           const ok=texture=>{
             if(settled){releaseAtlasTexture(texture);return;}
             settled=true;window.clearTimeout(timeout);
@@ -383,9 +459,10 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
             settled=true;window.clearTimeout(timeout);reject(error);
           };
           try{
-            if(id==='clouds')loadCloudImage(THREE,ok,fail);
-            else if(id==='night')loadNightLights(THREE,ok,fail);
-            else loadPlanetPhoto(THREE,id,ok,fail);
+            const options={width:profile.textureWidth,small:profile.mobile};
+            if(id==='clouds')loadCloudImage(THREE,ok,fail,options);
+            else if(id==='night')loadNightLights(THREE,ok,fail,options);
+            else loadPlanetPhoto(THREE,id,ok,fail,options);
           }catch(error){fail(error);}
         }),
         failed:async(id,error)=>{
@@ -395,7 +472,7 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
           if(id==='clouds'){
             await new Promise(resolve=>{
               const cloudFallback=()=>{
-                try{if(!disposed&&webglReady)addEarthClouds(THREE,earth,{width:4096});}
+                try{if(!disposed&&webglReady)addEarthClouds(THREE,earth,{width:profile.textureWidth});}
                 catch(e){console.warn('Procedural clouds unavailable:',e);}
                 finally{resolve();}
               };
@@ -405,10 +482,19 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
           }else if(id!=='night')await fallbackMap(id);
           requestTexturePaint();
         },
-        onSettled:({completed,total})=>launchGate.progress(completed,total,failedAtlases),
+        onSettled:({id,completed,total})=>{
+          if(essentialSet.has(id))essentialsReady++;
+          if(profile.mobile){
+            launchGate.progress(essentialsReady,essentialSet.size,failedAtlases);
+            if(essentialsReady===essentialSet.size&&launchGate.active){
+              renderOnce();
+              window.requestAnimationFrame(()=>{if(!disposed)launchGate.close();});
+            }
+          }else launchGate.progress(completed,total,failedAtlases);
+        },
         onComplete:()=>{
-          if(disposed)return;
-          // Force final materials and shaders through WebGL before unveiling.
+          if(disposed||!launchGate.active)return;
+          // Finish the 100% indicator with the complete desktop atlas set.
           renderOnce();
           window.requestAnimationFrame(()=>{
             if(disposed)return;
@@ -429,16 +515,20 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         status.textContent='Graphics temporarily unavailable. Interactive 2D planet explorer remains available.';
       });
     }catch(error){
-      launchGate.close();
+      releaseBootMarker();launchGate.close();
       console.warn('Using 2D planet fallback:',error);
       root.classList.add('solar-fallback');hero?.classList.remove('has-three-background');
       status.textContent='Accessible 2D planet explorer ready.';
     }
   }
-  if(!reduced.matches)initializeThree();else {launchGate.close();root.classList.add('solar-fallback');renderOnce();}
+  if(!use2D)initializeThree();else {
+    releaseBootMarker();launchGate.close();root.classList.add('solar-fallback');renderOnce();
+    if(recoveredFromCrash)status.textContent='Mobile safe mode active after a previous interrupted graphics startup.';
+  }
   start();
   return ()=>{
-    disposed=true;detachRotation();launchGate.dispose();stop();textureQueue?.stop();
+    disposed=true;releaseBootMarker();releaseFocusTexture();detachRotation();
+    launchGate.dispose();stop();textureQueue?.stop();
     if(texturePaintRaf)window.cancelAnimationFrame(texturePaintRaf);
     observer?.disconnect();resizeObserver?.disconnect();root._cleanupSolarLayout?.();
     hero?.classList.remove('has-three-background');
