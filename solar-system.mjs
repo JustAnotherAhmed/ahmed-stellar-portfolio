@@ -513,8 +513,11 @@ export function initSolarSystem(root=document.getElementById('solar-system')) {
         event.preventDefault();
         // Remember lost mobile graphics state for this tab. The next page
         // load enters the safe 2D explorer instead of repeating a GPU crash.
+        webglReady=false;launchGate.close();stop();
+        // close() normally clears the boot marker. Store the lost-context
+        // signal afterwards so the next load genuinely enters safe mode.
         if(profile.mobile)try{window.sessionStorage?.setItem(bootKey,'pending');}catch{}
-        webglReady=false;launchGate.close();stop();root.classList.remove('has-three');
+        root.classList.remove('has-three');
         root.classList.add('solar-fallback');hero?.classList.remove('has-three-background');
         status.textContent='Graphics temporarily unavailable. Interactive 2D planet explorer remains available.';
       });
