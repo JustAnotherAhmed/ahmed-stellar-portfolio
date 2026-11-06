@@ -5,10 +5,10 @@ export function createTextureQueue(ids,{load,failed=()=>{},onSettled=()=>{},onCo
   if(typeof load!=='function'||!Number.isInteger(maxConcurrent)||maxConcurrent<1)
     throw new TypeError('A loader and positive concurrency limit are required');
   let pending=[...new Set(ids)],active=new Set(),complete=new Set();
-  let stopped=false,timer=null,finished=false;
+  let stopped=false,paused=false,timer=null,finished=false;
   const total=pending.length;
   const pump=()=>{
-    if(stopped)return;
+    if(stopped||paused)return;
     while(active.size<maxConcurrent&&pending.length){
       const id=pending.shift();
       if(complete.has(id)||active.has(id))continue;
@@ -31,7 +31,7 @@ export function createTextureQueue(ids,{load,failed=()=>{},onSettled=()=>{},onCo
     }
   };
   const next=()=>{
-    if(stopped||timer!==null)return;
+    if(stopped||paused||timer!==null)return;
     timer=schedule(()=>{timer=null;pump();},delayMs);
   };
   return {
@@ -41,6 +41,8 @@ export function createTextureQueue(ids,{load,failed=()=>{},onSettled=()=>{},onCo
       const index=pending.indexOf(id);
       if(index>=0){pending.splice(index,1);pending.unshift(id);next();}
     },
+    pause(){paused=true;if(timer!==null){cancel(timer);timer=null;}},
+    resume(){if(stopped||!paused)return;paused=false;next();},
     stop(){stopped=true;pending=[];if(timer!==null){cancel(timer);timer=null;}},
     get pending(){return [...pending];},
     get active(){return [...active];},

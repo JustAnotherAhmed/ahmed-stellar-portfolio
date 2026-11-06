@@ -108,7 +108,7 @@ export function makeRingTexture(THREE,id,width=4096){
   t.anisotropy=16;t.generateMipmaps=true;
   return t;
 }
-export function addRings(THREE,mesh,id){
+export function addRings(THREE,mesh,id,{width=4096}={}){
   const specifications={
     jupiter:{inner:1.32,outer:1.48,opacity:.19,tilt:.63},
     saturn:{inner:1.18,outer:2.18,opacity:.87,tilt:.48},
@@ -124,7 +124,7 @@ export function addRings(THREE,mesh,id){
   }
   uv.needsUpdate=true;
   const rings=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({
-    map:makeRingTexture(THREE,id),side:THREE.DoubleSide,transparent:true,
+    map:makeRingTexture(THREE,id,width),side:THREE.DoubleSide,transparent:true,
     opacity:config.opacity,alphaTest:.035,roughness:1,metalness:0,depthWrite:false
   }));
   rings.rotation.x=config.tilt;rings.rotation.y=.18;mesh.add(rings);
@@ -191,8 +191,9 @@ export const ATLAS_WIDTH=4096;
 export function atlasUrl(filename){
   return 'https://www.solarsystemscope.com/textures/download/'+filename;
 }
-export function planetPhotoUrl(id){
-  const file=PHOTO_TEXTURE_PATHS[id];return file?atlasUrl(file):null;
+export function planetPhotoUrl(id,{small=false}={}){
+  const file=PHOTO_TEXTURE_PATHS[id];
+  return file?atlasUrl(small?file.replace(/^(?:8k|4k)_/,'2k_'):file):null;
 }
 export function prepare4kTexture(THREE,image,{width=ATLAS_WIDTH}={}){
   if(typeof document==='undefined')throw new Error('Canvas environment unavailable');
@@ -234,17 +235,18 @@ export function releaseAtlasTexture(texture){
   texture?.dispose?.();
   texture?.userData?.ownedBitmap?.close?.();
 }
-export function loadPlanetPhoto(THREE,id,onLoad,onError=()=>{}){
-  const file=PHOTO_TEXTURE_PATHS[id];if(!file){onError(new Error('No atlas for '+id));return;}
+export function loadPlanetPhoto(THREE,id,onLoad,onError=()=>{},{width=ATLAS_WIDTH,small=false}={}){
+  const url=planetPhotoUrl(id,{small});if(!url){onError(new Error('No atlas for '+id));return;}
   const loader=new THREE.ImageLoader();loader.setCrossOrigin('anonymous');
-  loader.load(atlasUrl(file),image=>{
-    void prepare4kTextureAsync(THREE,image).then(onLoad).catch(onError);
+  loader.load(url,image=>{
+    void prepare4kTextureAsync(THREE,image,{width}).then(onLoad).catch(onError);
   },undefined,onError);
 }
-export function loadCloudImage(THREE,onLoad,onError=()=>{}){
+export function loadCloudImage(THREE,onLoad,onError=()=>{},{width=ATLAS_WIDTH,small=false}={}){
+  const file=small?'2k_earth_clouds.jpg':EARTH_DETAIL_PATHS.clouds;
   const loader=new THREE.ImageLoader();loader.setCrossOrigin('anonymous');
-  loader.load(atlasUrl(EARTH_DETAIL_PATHS.clouds),image=>{
-    void prepare4kTextureAsync(THREE,image).then(onLoad).catch(onError);
+  loader.load(atlasUrl(file),image=>{
+    void prepare4kTextureAsync(THREE,image,{width}).then(onLoad).catch(onError);
   },undefined,onError);
 }
 export function addEarthNightLights(THREE,earth,texture){
@@ -266,9 +268,10 @@ export function addEarthNightLights(THREE,earth,texture){
   const globe=new THREE.Mesh(new THREE.SphereGeometry(1.009,160,112),material);
   globe.name='Earth city lights';earth.add(globe);return globe;
 }
-export function loadNightLights(THREE,onLoad,onError=()=>{}){
+export function loadNightLights(THREE,onLoad,onError=()=>{},{width=ATLAS_WIDTH,small=false}={}){
+  const file=small?'2k_earth_nightmap.jpg':EARTH_DETAIL_PATHS.night;
   const loader=new THREE.ImageLoader();loader.setCrossOrigin('anonymous');
-  loader.load(atlasUrl(EARTH_DETAIL_PATHS.night),image=>{
-    void prepare4kTextureAsync(THREE,image).then(onLoad).catch(onError);
+  loader.load(atlasUrl(file),image=>{
+    void prepare4kTextureAsync(THREE,image,{width}).then(onLoad).catch(onError);
   },undefined,onError);
 }

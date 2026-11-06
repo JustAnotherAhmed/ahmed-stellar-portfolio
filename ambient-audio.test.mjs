@@ -206,3 +206,49 @@ test('mobile soundtrack can unlock from the cinematic loading screen',async()=>{
   assert.equal(doc.button.dataset.playing,'true');
   stop();
 });
+
+test('mobile does not create a stuck audio context before a genuine gesture',async()=>{
+  const doc=new FakeDoc(),engine=mockEngine();
+  doc.defaultView.matchMedia=()=>({matches:true});
+  let factories=0;
+  const stop=initAmbientAudio({doc,engineFactory:()=>{factories++;return engine;}});
+  await flush();
+  assert.equal(factories,0);
+  assert.equal(doc.button.getAttribute('aria-pressed'),'true');
+  assert.equal(doc.button.label.textContent,'Play sound');
+  doc.dispatchEvent(new Event('pointerdown'));await flush();
+  assert.equal(factories,1);
+  assert.equal(doc.button.dataset.playing,'true');
+  assert.equal(engine.calls.filter(x=>x==='play').length,1);
+  stop();
+});
+test('mobile sound toggle creates engine inside first click and respects explicit mute',async()=>{
+  const doc=new FakeDoc(),calls=[];
+  doc.defaultView.matchMedia=()=>({matches:true});
+  const stop=initAmbientAudio({doc,engineFactory:()=>({
+    setVolume(){},unlock(){calls.push('unlock');},
+    async play(){calls.push('play');},
+    async pause(){calls.push('pause');},playEffect(){},async dispose(){}
+  })});
+  await flush();assert.equal(calls.length,0);
+  doc.button.click();await flush();
+  assert.deepEqual(calls.slice(0,2),['unlock','play']);
+  assert.equal(doc.button.dataset.playing,'true');
+  doc.button.click();await flush();
+  assert.equal(doc.defaultView.localStorage.getItem(AUDIO_PREFERENCE_KEY),'off');
+  stop();
+});
+test('mobile loading-screen CTA can recover a previous off preference',async()=>{
+  const doc=new FakeDoc(),engine=mockEngine();
+  doc.defaultView.matchMedia=()=>({matches:true});
+  doc.loaderAudio=new FakeNode();doc.nodes['stellar-audio-start']=doc.loaderAudio;
+  doc.defaultView.localStorage.setItem(AUDIO_PREFERENCE_KEY,'off');
+  const stop=initAmbientAudio({doc,engineFactory:()=>engine});
+  assert.equal(doc.button.getAttribute('aria-pressed'),'false');
+  assert.equal(doc.loaderAudio.hidden,false);
+  assert.match(doc.loaderAudio.textContent,/Enable soundtrack/);
+  doc.loaderAudio.click();await flush();
+  assert.equal(doc.defaultView.localStorage.getItem(AUDIO_PREFERENCE_KEY),'on');
+  assert.equal(doc.button.dataset.playing,'true');
+  stop();
+});

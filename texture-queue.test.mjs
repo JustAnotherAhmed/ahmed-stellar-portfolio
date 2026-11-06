@@ -44,7 +44,7 @@ test('4K textures remain while supersampling respects a framebuffer budget',()=>
   assert.ok(balancedPixelRatio(1920,1080,2)>=2);
   assert.equal(balancedPixelRatio(0,900),1);
   const solar=read('solar-system.mjs');
-  assert.match(solar,/new THREE\.SphereGeometry\(1,192,144\)/);
+  assert.match(solar,/new THREE\.SphereGeometry\(1,profile\.mobile\?96:192,profile\.mobile\?72:144\)/);
   assert.match(solar,/textureQueue\?\.prioritize\(nextId\)/);
   assert.match(solar,/anchoredCameraOffset\(world\.position,cameraState,worldScale,cameraState\.zoom/);
   assert.match(solar,/addEarthNightLights/);
@@ -72,4 +72,20 @@ test('progress reports all prepared atlases only after asynchronous fallback wor
   assert.equal(completed[0].total,2);
   assert.equal(settled.filter(x=>!x.success).length,1);
   queue.stop();
+});
+
+test('background tab pauses new atlas downloads and foreground resumes',async()=>{
+  const seen=[];
+  const q=createTextureQueue(['earth','sun','mars'],{maxConcurrent:1,delayMs:1,load:id=>{
+    seen.push(id);return Promise.resolve();
+  }});
+  q.pause();q.start();await sleep(12);
+  assert.deepEqual(seen,[]);
+  q.resume();await sleep(8);q.pause();
+  assert.ok(seen.length>=1&&seen.length<=3);
+  const n=seen.length;await sleep(12);
+  assert.equal(seen.length,n);
+  q.resume();await sleep(30);
+  assert.deepEqual(seen,['earth','sun','mars']);
+  q.stop();
 });

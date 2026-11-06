@@ -36,7 +36,7 @@ test('rotation layer preserves cinematic focus and 4K texture targets',()=>{
  assert.match(s,/attachPlanetRotation/);
  assert.match(s,/rotatePlanet\(mesh,dx,dy\)/);
  assert.match(s,/anchoredCameraOffset\(world\.position,cameraState,worldScale,cameraState\.zoom/);
- assert.match(s,/cinematicPixelRatio/);
+ assert.match(s,/adaptivePixelRatio/);
  assert.match(h,/id="planet-rotation-pad"/);
  assert.match(css,/touch-action:none/);
 });

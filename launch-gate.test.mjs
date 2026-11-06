@@ -12,10 +12,10 @@ class Target{
   querySelector(name){return this.items?.[name]||null;}
 }
 function mockDoc(){
- const root=new Target(),text={textContent:''},meter={value:0,max:0},skip=new Target();
+ const root=new Target(),text={textContent:''},percent={textContent:''},meter={value:0,max:0},skip=new Target();
  const header=new Target(),main=new Target(),body=new Target();
- root.items={'#stellar-loader-message':text,'#stellar-loader-meter':meter,'#stellar-loader-skip':skip};
- return {root,text,meter,skip,header,main,body,
+ root.items={'#stellar-loader-message':text,'#stellar-loader-percent':percent,'#stellar-loader-meter':meter,'#stellar-loader-skip':skip};
+ return {root,text,percent,meter,skip,header,main,body,
    document:{body,querySelector:key=>key==='header'?header:null,
    getElementById:key=>key==='stellar-loader'?root:key==='main'?main:null}
  };
@@ -27,9 +27,11 @@ test('stages high-quality scene behind keyboard-accessible loading dialog',()=>{
  assert.equal(t.root.hidden,false);
  assert.equal(t.header.inert,true);
  assert.equal(t.main.inert,true);
- assert.equal(t.meter.max,12);
+ assert.equal(t.meter.max,100);
+ assert.equal(t.percent.textContent,'0%');
  gate.progress(5,12);
- assert.equal(t.meter.value,5);
+ assert.equal(t.meter.value,42);
+ assert.equal(t.percent.textContent,'42%');
  assert.match(t.text.textContent,/5 of 12/);
  pending[0]();
  assert.equal(t.skip.hidden,false);
@@ -43,6 +45,8 @@ test('completion or failure can release the screen, and repeated cleanup is safe
  const gate=createLaunchGate({doc:t.document,schedule:()=>1,cancel:()=>{}});
  gate.open(10);gate.progress(10,10,1);
  assert.match(t.text.textContent,/fallback artwork/);
+ assert.equal(t.meter.value,100);
+ assert.equal(t.percent.textContent,'100%');
  gate.close();gate.dispose();
  assert.equal(t.root.hidden,true);
  assert.equal(t.skip.handlers.size,0);
@@ -53,11 +57,28 @@ test('gate never blocks pages without the optional UI',()=>{
 });
 test('solar scene waits for atlas completion and pre-renders before reveal',()=>{
  const solar=read('solar-system.mjs'),queue=read('texture-queue.mjs'),html=read('index.html');
- assert.match(solar,/launchGate\.open\(SOLAR_BODIES\.length\+2\)/);
+ assert.match(solar,/launchGate\.open\(profile\.mobile\?profile\.initialIds\.length:SOLAR_BODIES\.length\+2\)/);
  assert.match(solar,/onComplete:\(\)=>\{/);
  assert.match(solar,/launchGate\.close\(\)/);
- assert.match(solar,/maxConcurrent:2,delayMs:180/);
+ assert.match(solar,/maxConcurrent:profile\.mapConcurrency,delayMs:profile\.mobile\?80:180/);
  assert.match(queue,/onSettled/);
  assert.match(html,/id="stellar-loader-meter"/);
  assert.match(html,/id="stellar-loader-skip"/);
+});
+
+test('mobile loading screen can automatically release on slow connections without falsely showing 100%',()=>{
+ const t=mockDoc(),timers=new Map();let next=0,releaseCount=0;
+ const gate=createLaunchGate({doc:t.document,
+  schedule:(fn,ms)=>{const id=++next;timers.set(id,{fn,ms});return id;},
+  cancel:id=>timers.delete(id),skipAfterMs:3500,autoReleaseAfterMs:8500,
+  onReleased:()=>{releaseCount++;}
+ });
+ gate.open(4);gate.progress(1,4);
+ assert.equal(t.percent.textContent,'25%');
+ const timeout=[...timers.values()].find(x=>x.ms===8500);
+ assert.ok(timeout);
+ timeout.fn();
+ assert.equal(t.root.hidden,true);
+ assert.equal(releaseCount,1);
+ assert.equal(t.percent.textContent,'25%');
 });

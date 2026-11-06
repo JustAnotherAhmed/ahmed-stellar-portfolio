@@ -45,7 +45,7 @@ test('ultra-HD rings and Earth night lights retain full camera focus',()=>{
   assert.match(textures,/uv\.setXY\(i,\(r-config\.inner\)/);
   assert.match(textures,/addEarthNightLights/);
   assert.match(textures,/sunWorldPosition/);
-  assert.match(solar,/new THREE\.SphereGeometry\(1,192,144\)/);
+  assert.match(solar,/new THREE\.SphereGeometry\(1,profile\.mobile\?96:192,profile\.mobile\?72:144\)/);
   assert.match(solar,/textureQueue=createTextureQueue\(queueIds/);
   assert.match(solar,/loadNightLights/);
   assert.match(solar,/anchoredCameraOffset\(world\.position,cameraState,worldScale,cameraState\.zoom/);
@@ -56,4 +56,13 @@ test('GPU resolution prioritizes quality while honoring renderbuffer bounds',()=
   assert.equal(cinematicPixelRatio(1440,900,3),4);
   assert.equal(cinematicPixelRatio(800,700,3,2048),2048/800);
   assert.equal(cinematicPixelRatio(0,900,2),1);
+});
+
+test('mobile ring maps scale down without reducing desktop ring detail',()=>{
+  const textures=read('planet-textures.mjs'),solar=read('solar-system.mjs');
+  assert.match(textures,/addRings\(THREE,mesh,id,\{width=4096\}=\{\}\)/);
+  assert.match(textures,/map:makeRingTexture\(THREE,id,width\)/);
+  assert.match(solar,/addRings\(THREE,mesh,body\.id,\{width:profile\.mobile\?1024:4096\}\)/);
+  assert.match(solar,/webglcontextlost/);
+  assert.match(solar,/setItem\(bootKey,'pending'\)/);
 });
